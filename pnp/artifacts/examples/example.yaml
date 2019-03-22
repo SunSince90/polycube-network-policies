@@ -1,0 +1,8 @@
+# A very basic example of a Polycube Network Policy
+---
+apiVersion: polycubenetwork.com/v1beta
+kind: NetworkPolicy
+metadata: 
+  name: polycube-hello-world
+spec:
+  description: "Hello, world!"
