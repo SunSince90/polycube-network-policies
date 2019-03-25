@@ -1,6 +1,7 @@
 package v1beta
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -31,7 +32,7 @@ func Resource(resource string) schema.GroupResource {
 
 // Adds the list of known types to the given scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
-	/*scheme.AddKnownTypes(
+	scheme.AddKnownTypes(
 		SchemeGroupVersion,
 		&NetworkPolicy{},
 		&NetworkPolicyList{},
@@ -45,7 +46,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	metav1.AddToGroupVersion(
 		scheme,
 		SchemeGroupVersion,
-	)*/
+	)
 
 	return nil
 }
