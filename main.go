@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"os"
 
 	log "github.com/Sirupsen/logrus"
 
@@ -13,7 +13,7 @@ import (
 
 func getKubernetesClient() (kubernetes.Interface, pnp_clientset.Interface) {
 
-	kubeconfig := "/var/lib/pcn_k8s/kubeconfig.conf"
+	kubeconfig := os.Getenv("HOME") + "/.kube/config"
 
 	// use the current context in kubeconfig
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
@@ -37,12 +37,9 @@ func getKubernetesClient() (kubernetes.Interface, pnp_clientset.Interface) {
 }
 
 func main() {
-	fmt.Println("Hello, World!")
+	log.Infoln("Hello, World!")
 
 	kclientset, _ := getKubernetesClient()
-
-	//	Set up the network policy controller (for the kubernetes policies)
-	//defaultnpc = pcn_controllers.NewDefaultNetworkPolicyController(nodeName, clientset)
 
 	controller.NewPcnPolicyController(kclientset)
 }

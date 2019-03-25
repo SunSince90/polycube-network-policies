@@ -2,38 +2,35 @@ package controller
 
 import (
 	log "github.com/Sirupsen/logrus"
-	"k8s.io/client-go/kubernetes"
-	/*"time"
+	pnp_clientset "github.com/SunSince90/polycube-network-policies/pkg/client/clientset/versioned"
 	pnp_informer "github.com/SunSince90/polycube-network-policies/pkg/client/informers/externalversions/polycubenetwork.com/v1beta"
-		log "github.com/Sirupsen/logrus"
-		utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-		"k8s.io/apimachinery/pkg/util/wait"
-		"k8s.io/client-go/kubernetes"
-		"k8s.io/client-go/tools/cache"
-		"k8s.io/client-go/util/workqueue"*/)
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
+)
 
 // Controller struct defines how a controller should encapsulate
 // logging, client connectivity, informing (list and watching)
 // queueing, and handling of resource changes
-/*type PcnPolicyController struct {
-	logger    *log.Entry
-	clientset kubernetes.Interface
-	queue     workqueue.RateLimitingInterface
-	informer  cache.SharedIndexInformer
-	handler   Handler
-}*/
+type PcnPolicyController struct {
+	logger     *log.Entry
+	kclientset kubernetes.Interface
+	queue      workqueue.RateLimitingInterface
+	informer   cache.SharedIndexInformer
+	//handler    Handler
+}
 
-func NewPcnPolicyController(clientset kubernetes.Interface) {
+func NewPcnPolicyController(kclientset kubernetes.Interface, pclientset pnp_clientset.Interface) *PcnPolicyController {
 
 	log.NewEntry(log.New())
-
 	log.Infoln("hello from the controller")
 
 	// retrieve our custom resource informer which was generated from
 	// the code generator and pass it the custom resource client, specifying
 	// we should be looking through all namespaces for listing and watching
-	/*informer := myresourceinformer_v1.NewMyResourceInformer(
-		myresourceClient,
+	informer := pnp_informer.NewNetworkPolicyInformer(
+		pclientset,
 		meta_v1.NamespaceAll,
 		0,
 		cache.Indexers{},
@@ -56,14 +53,14 @@ func NewPcnPolicyController(clientset kubernetes.Interface) {
 			log.Infof("Add myresource: %s", key)
 			if err == nil {
 				// add the key to the queue for the handler to get
-				queue.Add(key)
+				//queue.Add(key)
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(newObj)
 			log.Infof("Update myresource: %s", key)
 			if err == nil {
-				queue.Add(key)
+				//queue.Add(key)
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -75,7 +72,7 @@ func NewPcnPolicyController(clientset kubernetes.Interface) {
 			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 			log.Infof("Delete myresource: %s", key)
 			if err == nil {
-				queue.Add(key)
+				//queue.Add(key)
 			}
 		},
 	})
@@ -83,17 +80,19 @@ func NewPcnPolicyController(clientset kubernetes.Interface) {
 	// construct the Controller object which has all of the necessary components to
 	// handle logging, connections, informing (listing and watching), the queue,
 	// and the handler
-	controller := Controller{
-		logger:    log.NewEntry(log.New()),
-		clientset: client,
-		informer:  informer,
-		queue:     queue,
-		handler:   &TestHandler{},
+	controller := PcnPolicyController{
+		logger:     log.NewEntry(log.New()),
+		kclientset: kclientset,
+		informer:   informer,
+		queue:      queue,
+		//handler:   &TestHandler{},
 	}
 
 	// use a channel to synchronize the finalization for a graceful shutdown
 	stopCh := make(chan struct{})
-	defer close(stopCh)*/
+	defer close(stopCh)
+
+	return &controller
 }
 
 // Run is the main path of execution for the controller loop
