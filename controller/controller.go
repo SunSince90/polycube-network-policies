@@ -1,10 +1,15 @@
 package controller
 
 import (
+	"fmt"
+	"time"
+
 	log "github.com/Sirupsen/logrus"
 	pnp_clientset "github.com/SunSince90/polycube-network-policies/pkg/client/clientset/versioned"
 	pnp_informer "github.com/SunSince90/polycube-network-policies/pkg/client/informers/externalversions/polycubenetwork.com/v1beta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -88,15 +93,11 @@ func NewPcnPolicyController(kclientset kubernetes.Interface, pclientset pnp_clie
 		//handler:   &TestHandler{},
 	}
 
-	// use a channel to synchronize the finalization for a graceful shutdown
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
 	return &controller
 }
 
 // Run is the main path of execution for the controller loop
-/*func (c *Controller) Run(stopCh <-chan struct{}) {
+func (c *PcnPolicyController) Run(stopCh <-chan struct{}) {
 	// handle a panic with logging and exiting
 	defer utilruntime.HandleCrash()
 	// ignore new items in the queue but when all goroutines
@@ -117,16 +118,16 @@ func NewPcnPolicyController(kclientset kubernetes.Interface, pclientset pnp_clie
 
 	// run the runWorker method every second with a stop channel
 	wait.Until(c.runWorker, time.Second, stopCh)
-}*/
+}
 
 // HasSynced allows us to satisfy the Controller interface
 // by wiring up the informer's HasSynced method to it
-/*func (c *Controller) HasSynced() bool {
+func (c *PcnPolicyController) HasSynced() bool {
 	return c.informer.HasSynced()
-}*/
+}
 
 // runWorker executes the loop to process new items added to the queue
-/*func (c *Controller) runWorker() {
+func (c *PcnPolicyController) runWorker() {
 	log.Info("Controller.runWorker: starting")
 
 	// invoke processNextItem to fetch and consume the next change
@@ -136,12 +137,12 @@ func NewPcnPolicyController(kclientset kubernetes.Interface, pclientset pnp_clie
 	}
 
 	log.Info("Controller.runWorker: completed")
-}*/
+}
 
 // processNextItem retrieves each queued item and takes the
 // necessary handler action based off of if the item was
 // created or deleted
-/*func (c *Controller) processNextItem() bool {
+func (c *PcnPolicyController) processNextItem() bool {
 	log.Info("Controller.processNextItem: start")
 
 	// fetch the next item (blocking) from the queue to process or
@@ -159,7 +160,7 @@ func NewPcnPolicyController(kclientset kubernetes.Interface, pclientset pnp_clie
 	defer c.queue.Done(key)
 
 	// assert the string out of the key (format `namespace/name`)
-	keyRaw := key.(string)
+	//keyRaw := key.(string)
 
 	// take the string key and get the object out of the indexer
 	//
@@ -171,7 +172,7 @@ func NewPcnPolicyController(kclientset kubernetes.Interface, pclientset pnp_clie
 	// then we want to retry this particular queue key a certain
 	// number of times (5 here) before we forget the queue key
 	// and throw an error
-	item, exists, err := c.informer.GetIndexer().GetByKey(keyRaw)
+	/*item, exists, err := c.informer.GetIndexer().GetByKey(keyRaw)
 	if err != nil {
 		if c.queue.NumRequeues(key) < 5 {
 			c.logger.Errorf("Controller.processNextItem: Failed processing item with key %s with error %v, retrying", key, err)
@@ -181,7 +182,7 @@ func NewPcnPolicyController(kclientset kubernetes.Interface, pclientset pnp_clie
 			c.queue.Forget(key)
 			utilruntime.HandleError(err)
 		}
-	}
+	}*/
 
 	// if the item doesn't exist then it was deleted and we need to fire off the handler's
 	// ObjectDeleted method. but if the object does exist that indicates that the object
@@ -189,7 +190,7 @@ func NewPcnPolicyController(kclientset kubernetes.Interface, pclientset pnp_clie
 	//
 	// after both instances, we want to forget the key from the queue, as this indicates
 	// a code path of successful queue key processing
-	if !exists {
+	/*if !exists {
 		c.logger.Infof("Controller.processNextItem: object deleted detected: %s", keyRaw)
 		c.handler.ObjectDeleted(item)
 		c.queue.Forget(key)
@@ -197,8 +198,8 @@ func NewPcnPolicyController(kclientset kubernetes.Interface, pclientset pnp_clie
 		c.logger.Infof("Controller.processNextItem: object created detected: %s", keyRaw)
 		c.handler.ObjectCreated(item)
 		c.queue.Forget(key)
-	}
+	}*/
 
 	// keep the worker loop running by returning true
 	return true
-}*/
+}
