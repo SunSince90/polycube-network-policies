@@ -56,7 +56,7 @@ func (in *NetworkPolicy) DeepCopyObject() runtime.Object {
 func (in *NetworkPolicyList) DeepCopyInto(out *NetworkPolicyList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]NetworkPolicy, len(*in))

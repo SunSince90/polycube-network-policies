@@ -34,8 +34,8 @@ func Resource(resource string) schema.GroupResource {
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(
 		SchemeGroupVersion,
-		&NetworkPolicy{},
-		&NetworkPolicyList{},
+		&PolycubeNetworkPolicy{},
+		&PolycubeNetworkPolicyList{},
 	)
 
 	scheme.AddKnownTypes(
