@@ -3,7 +3,7 @@
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:  
-  name: networkpolicies.polycubenetwork.com
+  name: polycubenetworkpolicies.polycubenetwork.com
 spec:  
   group: polycubenetwork.com  
   version: v1beta
