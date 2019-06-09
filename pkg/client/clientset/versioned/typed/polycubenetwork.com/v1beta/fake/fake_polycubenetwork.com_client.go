@@ -28,8 +28,8 @@ type FakePolycubenetworkV1beta struct {
 	*testing.Fake
 }
 
-func (c *FakePolycubenetworkV1beta) NetworkPolicies(namespace string) v1beta.NetworkPolicyInterface {
-	return &FakeNetworkPolicies{c, namespace}
+func (c *FakePolycubenetworkV1beta) PolycubeNetworkPolicies(namespace string) v1beta.PolycubeNetworkPolicyInterface {
+	return &FakePolycubeNetworkPolicies{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

@@ -53,8 +53,8 @@ func (f *genericInformer) Lister() cache.GenericLister {
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=polycubenetwork.com, Version=v1beta
-	case v1beta.SchemeGroupVersion.WithResource("networkpolicies"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Polycubenetwork().V1beta().NetworkPolicies().Informer()}, nil
+	case v1beta.SchemeGroupVersion.WithResource("polycubenetworkpolicies"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Polycubenetwork().V1beta().PolycubeNetworkPolicies().Informer()}, nil
 
 	}
 

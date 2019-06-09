@@ -18,4 +18,4 @@ limitations under the License.
 
 package v1beta
 
-type NetworkPolicyExpansion interface{}
+type PolycubeNetworkPolicyExpansion interface{}

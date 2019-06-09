@@ -18,10 +18,10 @@ limitations under the License.
 
 package v1beta
 
-// NetworkPolicyListerExpansion allows custom methods to be added to
-// NetworkPolicyLister.
-type NetworkPolicyListerExpansion interface{}
+// PolycubeNetworkPolicyListerExpansion allows custom methods to be added to
+// PolycubeNetworkPolicyLister.
+type PolycubeNetworkPolicyListerExpansion interface{}
 
-// NetworkPolicyNamespaceListerExpansion allows custom methods to be added to
-// NetworkPolicyNamespaceLister.
-type NetworkPolicyNamespaceListerExpansion interface{}
+// PolycubeNetworkPolicyNamespaceListerExpansion allows custom methods to be added to
+// PolycubeNetworkPolicyNamespaceLister.
+type PolycubeNetworkPolicyNamespaceListerExpansion interface{}

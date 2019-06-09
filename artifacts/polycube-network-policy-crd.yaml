@@ -9,8 +9,8 @@ spec:
   version: v1beta
   scope: Namespaced  
   names:    
-    kind: NetworkPolicy   
+    kind: PolycubeNetworkPolicy   
     shortNames: 
     - pnp
-    plural: networkpolicies
-    singular: networkpolicy
+    plural: polycubenetworkpolicies
+    singular: polycubenetworkpolicy
