@@ -91,15 +91,21 @@ type PolycubeNetworkPolicyIngressRule struct {
 	// From is the peer
 	From PolycubeNetworkPolicyPeer `json:"from,omitempty"`
 	// Protocol is the level 4 protocol
-	Protocol PolycubeNetworkPolicyProtocol `json:"protocol,omitempty"`
-	// Ports is the container of the ports
-	Ports PolycubeNetworkPolicyPorts `json:"ports,omitempty"`
+	Protocols []PolycubeNetworkPolicyProtocolContainer `json:"protocols,omitempty"`
 	// TCPFlags is a list of TCP flags
 	TCPFlags []PolycubeNetworkPolicyTCPFlag `json:"tcpflags,omitempty"`
 	// Action is the action to be taken
 	Action PolycubeNetworkPolicyRuleAction `json:"action,omitempty"`
 	// Description is the description of the rule
 	Description string `json:"description,omitempty"`
+}
+
+// PolycubeNetworkPolicyProtocolContainer contains the protocol details
+type PolycubeNetworkPolicyProtocolContainer struct {
+	// Ports is the container of the ports
+	Ports PolycubeNetworkPolicyPorts `json:"ports,omitempty"`
+	// Protocol is the l4 protocol
+	Protocol PolycubeNetworkPolicyProtocol
 }
 
 // PolycubeNetworkPolicyIngressServiceRuleContainer contains rules bound to certain services
@@ -183,16 +189,13 @@ type PolycubeNetworkPolicyPeer struct {
 	WithIP PolycubeNetworkPolicyWithIP `json:"withIP,omitempty"`
 	// +optional
 	// OnNamespace specifies the namespaces of the peer. Only for Deployment, Pod
-	OnNamespace PolycubeNetworkPolicyNamespaceSelector `json:"onNamespace,omitempty"`
+	OnNamespace *PolycubeNetworkPolicyNamespaceSelector `json:"onNamespace,omitempty"`
 }
 
 // PolycubeNetworkPolicyWithIP is the IP container
 type PolycubeNetworkPolicyWithIP struct {
 	//	List is a list of IPs in CIDR notation
 	List []string `json:"list,omitempty"`
-	// +optional
-	// Except is a list of IPs in CIDR Notation
-	Except []string `json:"except,omitempty"`
 }
 
 // PolycubeNetworkPolicyPeerObject is the object peer
@@ -200,11 +203,11 @@ type PolycubeNetworkPolicyPeerObject string
 
 const (
 	// DeploymentPeer is the Deployment
-	DeploymentPeer PolycubeNetworkPolicyTargetObject = "deployment"
+	DeploymentPeer PolycubeNetworkPolicyPeerObject = "deployment"
 	// PodPeer is the Pod
-	PodPeer PolycubeNetworkPolicyTargetObject = "pod"
+	PodPeer PolycubeNetworkPolicyPeerObject = "pod"
 	// WorldPeer is the World
-	WorldPeer PolycubeNetworkPolicyTargetObject = "world"
+	WorldPeer PolycubeNetworkPolicyPeerObject = "world"
 )
 
 // PolycubeNetworkPolicyNamespaceSelector is a selector for namespaces
@@ -215,6 +218,9 @@ type PolycubeNetworkPolicyNamespaceSelector struct {
 	// +optional
 	// WithLabels is the namespace's labels
 	WithLabels map[string]string `json:"withLabels,omitempty"`
+	// +optional
+	// Any specifies any namespace
+	Any *bool `json:"withLabels,omitempty"`
 }
 
 // PolycubeNetworkPolicyProtocol is the level 4 protocol
