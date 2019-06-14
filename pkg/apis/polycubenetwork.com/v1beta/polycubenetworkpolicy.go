@@ -39,6 +39,8 @@ const (
 	DeploymentTarget PolycubeNetworkPolicyTargetObject = "deployment"
 	// PodTarget represents a Pod
 	PodTarget PolycubeNetworkPolicyTargetObject = "pod"
+	// ServiceTarget represents a Deployment
+	ServiceTarget PolycubeNetworkPolicyTargetObject = "service"
 )
 
 // PolycubeNetworkPolicySpec contains the specifications of this Network Policy
@@ -65,9 +67,6 @@ type PolycubeNetworkPolicyIngressRuleContainer struct {
 	// +optional
 	// Rules is a list of ingress rules
 	Rules []PolycubeNetworkPolicyIngressRule `json:"rules,omitempty"`
-	// +optional
-	// ServiceRules specifies that the rules are bound to services
-	ServiceRules []PolycubeNetworkPolicyIngressServiceRuleContainer `json:"serviceRules,omitempty"`
 }
 
 // PolycubeNetworkPolicyEgressRuleContainer is a container of egress rules
@@ -81,9 +80,6 @@ type PolycubeNetworkPolicyEgressRuleContainer struct {
 	// +optional
 	// Rules is a list of egress rules
 	Rules []PolycubeNetworkPolicyEgressRule `json:"rules,omitempty"`
-	// +optional
-	// ServiceRules specifies that the rules are bound to services
-	ServiceRules []PolycubeNetworkPolicyEgressServiceRuleContainer `json:"serviceRules,omitempty"`
 }
 
 // PolycubeNetworkPolicyIngressRule is an ingress rule
@@ -108,33 +104,7 @@ type PolycubeNetworkPolicyProtocolContainer struct {
 	Protocol PolycubeNetworkPolicyProtocol
 }
 
-// PolycubeNetworkPolicyIngressServiceRuleContainer contains rules bound to certain services
-type PolycubeNetworkPolicyIngressServiceRuleContainer struct {
-	// ApplyToServices is a list of services
-	ApplyToServices []string `json:"applyToServices,omitempty"`
-	// +optional
-	// DropAll specifies to drop everything in ingress
-	DropAll *bool `json:"dropAll,omitempty"`
-	// +optional
-	// AllowAll specifies to allow anyone in ingress
-	AllowAll *bool `json:"allowAll,omitempty"`
-	// +optional
-	// Rules is a list of rules bound with the specified services
-	Rules []PolycubeNetworkPolicyIngressServiceRule `json:"rules,omitempty"`
-}
-
-// PolycubeNetworkPolicyIngressServiceRule is the rules about certain service
-type PolycubeNetworkPolicyIngressServiceRule struct {
-	// From is the peer
-	From PolycubeNetworkPolicyPeer `json:"from,omitempty"`
-	// Action is the action to be taken
-	Action PolycubeNetworkPolicyRuleAction `json:"action,omitempty"`
-	// Description is the description of this rule
-	Description string `json:"description,omitempty"`
-	// TCPFlags is a list of TCP Flags
-	TCPFlags []PolycubeNetworkPolicyTCPFlag `json:"tcpflags,omitempty"`
-}
-
+// PolycubeNetworkPolicyEgressRule the rule for egress
 type PolycubeNetworkPolicyEgressRule struct {
 	To          PolycubeNetworkPolicyPeer       `json:"to,omitempty"`
 	Protocol    PolycubeNetworkPolicyProtocol   `json:"protocol,omitempty"`
@@ -142,33 +112,6 @@ type PolycubeNetworkPolicyEgressRule struct {
 	TCPFlags    []PolycubeNetworkPolicyTCPFlag  `json:"tcpflags,omitempty"`
 	Action      PolycubeNetworkPolicyRuleAction `json:"action,omitempty"`
 	Description string                          `json:"description,omitempty"`
-}
-
-// PolycubeNetworkPolicyEgressServiceRuleContainer contains rules bound to certain services
-type PolycubeNetworkPolicyEgressServiceRuleContainer struct {
-	// ApplyToServices is a list of services
-	ApplyToServices []string `json:"applyToServices,omitempty"`
-	// +optional
-	// DropAll specifies to drop everything in egress
-	DropAll *bool `json:"dropAll,omitempty"`
-	// +optional
-	// AllowAll specifies to allow anyone in egress
-	AllowAll *bool `json:"allowAll,omitempty"`
-	// +optional
-	// Rules is a list of rules bound with the specified services
-	Rules []PolycubeNetworkPolicyEgressServiceRule `json:"rules,omitempty"`
-}
-
-// PolycubeNetworkPolicyEgressServiceRule is the rules about certain service
-type PolycubeNetworkPolicyEgressServiceRule struct {
-	// From is the peer
-	From PolycubeNetworkPolicyPeer `json:"from,omitempty"`
-	// Action is the action to be taken
-	Action PolycubeNetworkPolicyRuleAction `json:"action,omitempty"`
-	// Description is the description of this rule
-	Description string `json:"description,omitempty"`
-	// TCPFlags is a list of TCP Flags
-	TCPFlags []PolycubeNetworkPolicyTCPFlag `json:"tcpflags,omitempty"`
 }
 
 // PolycubeNetworkPolicyPeer contains data of the peer
@@ -220,7 +163,7 @@ type PolycubeNetworkPolicyNamespaceSelector struct {
 	WithLabels map[string]string `json:"withLabels,omitempty"`
 	// +optional
 	// Any specifies any namespace
-	Any *bool `json:"withLabels,omitempty"`
+	Any *bool `json:"any,omitempty"`
 }
 
 // PolycubeNetworkPolicyProtocol is the level 4 protocol
