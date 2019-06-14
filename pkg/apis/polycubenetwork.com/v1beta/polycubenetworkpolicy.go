@@ -86,7 +86,7 @@ type PolycubeNetworkPolicyEgressRuleContainer struct {
 type PolycubeNetworkPolicyIngressRule struct {
 	// From is the peer
 	From PolycubeNetworkPolicyPeer `json:"from,omitempty"`
-	// Protocol is the level 4 protocol
+	// Protocols is the level 4 protocol list
 	Protocols []PolycubeNetworkPolicyProtocolContainer `json:"protocols,omitempty"`
 	// TCPFlags is a list of TCP flags
 	TCPFlags []PolycubeNetworkPolicyTCPFlag `json:"tcpflags,omitempty"`
@@ -106,12 +106,16 @@ type PolycubeNetworkPolicyProtocolContainer struct {
 
 // PolycubeNetworkPolicyEgressRule the rule for egress
 type PolycubeNetworkPolicyEgressRule struct {
-	To          PolycubeNetworkPolicyPeer       `json:"to,omitempty"`
-	Protocol    PolycubeNetworkPolicyProtocol   `json:"protocol,omitempty"`
-	Ports       PolycubeNetworkPolicyPorts      `json:"ports,omitempty"`
-	TCPFlags    []PolycubeNetworkPolicyTCPFlag  `json:"tcpflags,omitempty"`
-	Action      PolycubeNetworkPolicyRuleAction `json:"action,omitempty"`
-	Description string                          `json:"description,omitempty"`
+	// To is the peer
+	To PolycubeNetworkPolicyPeer `json:"to,omitempty"`
+	// Protocols is the protocols list
+	Protocols []PolycubeNetworkPolicyProtocolContainer `json:"protocols,omitempty"`
+	// TCPFlags is a list of TCP flags
+	TCPFlags []PolycubeNetworkPolicyTCPFlag `json:"tcpflags,omitempty"`
+	// Action is the action to be taken
+	Action PolycubeNetworkPolicyRuleAction `json:"action,omitempty"`
+	// Description is the description of the rule
+	Description string `json:"description,omitempty"`
 }
 
 // PolycubeNetworkPolicyPeer contains data of the peer

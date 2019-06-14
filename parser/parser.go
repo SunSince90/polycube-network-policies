@@ -112,9 +112,11 @@ func (p *PnpParser) ParseIngress(ingress v1beta.PolycubeNetworkPolicyIngressRule
 	//	Preliminary checks
 	//-------------------------------------
 
+	//	Target is a service?
+
 	//	Allow all?
 	if ingress.AllowAll != nil && *ingress.AllowAll == true {
-		parsed.Ingress = append(parsed.Ingress, k8sfirewall.ChainRule{
+		parsed.Egress = append(parsed.Egress, k8sfirewall.ChainRule{
 			Action: pcn_types.ActionForward,
 		})
 
@@ -123,7 +125,7 @@ func (p *PnpParser) ParseIngress(ingress v1beta.PolycubeNetworkPolicyIngressRule
 
 	//	Drop all?
 	if ingress.DropAll != nil && *ingress.DropAll == true {
-		parsed.Ingress = append(parsed.Ingress, k8sfirewall.ChainRule{
+		parsed.Egress = append(parsed.Egress, k8sfirewall.ChainRule{
 			Action: pcn_types.ActionDrop,
 		})
 
@@ -131,7 +133,7 @@ func (p *PnpParser) ParseIngress(ingress v1beta.PolycubeNetworkPolicyIngressRule
 	}
 
 	//	No rules?
-	if len(ingress.Rules) < 1 && len(ingress.ServiceRules) < 1 {
+	if len(ingress.Rules) < 1 {
 		return parsed
 	}
 
@@ -141,15 +143,13 @@ func (p *PnpParser) ParseIngress(ingress v1beta.PolycubeNetworkPolicyIngressRule
 	for _, rule := range ingress.Rules {
 
 		//	Parse the peer
-		generatedRules := p.ParsePeer(rule.From, namespace, "ingress", rule.Action)
+		generatedRules := p.ParsePeer(rule.From, namespace, direction, rule.Action)
 
 		// Parse the protocols for ingress
 		for _, generated := range generatedRules.Ingress {
 			for _, protocol := range rule.Protocols {
 				tempRule := generated
-				tempRule.L4proto = protocol
-				tempRule.Dport = protocol.Destination
-				tempRule.Sport = protocol.Source
+				tempRule.Dport = protocol.Ports.Source
 				parsed.Ingress = append(parsed.Ingress, tempRule)
 			}
 		}
@@ -158,9 +158,7 @@ func (p *PnpParser) ParseIngress(ingress v1beta.PolycubeNetworkPolicyIngressRule
 		for _, generated := range generatedRules.Egress {
 			for _, protocol := range rule.Protocols {
 				tempRule := generated
-				tempRule.L4proto = protocol
-				tempRule.Dport = protocol.Destination
-				tempRule.Sport = protocol.Source
+				tempRule.Sport = protocol.Ports.Source
 				parsed.Egress = append(parsed.Egress, tempRule)
 			}
 		}
@@ -169,26 +167,28 @@ func (p *PnpParser) ParseIngress(ingress v1beta.PolycubeNetworkPolicyIngressRule
 	return parsed
 }
 
-// ParseIngress parses the Ingress section of a policy
-func (p *PnpParser) ParseIngress(ingress v1beta.PolycubeNetworkPolicyIngressRuleContainer, namespace string) pcn_types.ParsedRules {
+// ParseEgress parses the Egress section of a policy
+func (p *PnpParser) ParseEgress(egress v1beta.PolycubeNetworkPolicyEgressRuleContainer, namespace string) pcn_types.ParsedRules {
 
 	//-------------------------------------
 	//	Init
 	//-------------------------------------
 	l := log.NewEntry(p.log)
-	l.WithFields(log.Fields{"by": "pnp-parser", "method": "ParseIngress"})
+	l.WithFields(log.Fields{"by": "pnp-parser", "method": "ParseEgress"})
 	parsed := pcn_types.ParsedRules{
 		Ingress: []k8sfirewall.ChainRule{},
 		Egress:  []k8sfirewall.ChainRule{},
 	}
-	direction := "ingress"
+	direction := "egress"
 
 	//-------------------------------------
 	//	Preliminary checks
 	//-------------------------------------
 
+	//	Target is a service?
+
 	//	Allow all?
-	if ingress.AllowAll != nil && *ingress.AllowAll == true {
+	if egress.AllowAll != nil && *egress.AllowAll == true {
 		parsed.Ingress = append(parsed.Ingress, k8sfirewall.ChainRule{
 			Action: pcn_types.ActionForward,
 		})
@@ -197,7 +197,7 @@ func (p *PnpParser) ParseIngress(ingress v1beta.PolycubeNetworkPolicyIngressRule
 	}
 
 	//	Drop all?
-	if ingress.DropAll != nil && *ingress.DropAll == true {
+	if egress.DropAll != nil && *egress.DropAll == true {
 		parsed.Ingress = append(parsed.Ingress, k8sfirewall.ChainRule{
 			Action: pcn_types.ActionDrop,
 		})
@@ -206,36 +206,32 @@ func (p *PnpParser) ParseIngress(ingress v1beta.PolycubeNetworkPolicyIngressRule
 	}
 
 	//	No rules?
-	if len(ingress.Rules) < 1 && len(ingress.ServiceRules) < 1 {
+	if len(egress.Rules) < 1 {
 		return parsed
 	}
 
 	//-------------------------------------
 	//	Actual parsing
 	//-------------------------------------
-	for _, rule := range ingress.Rules {
+	for _, rule := range egress.Rules {
 
 		//	Parse the peer
-		generatedRules := p.ParsePeer(rule.From, namespace, "ingress", rule.Action)
+		generatedRules := p.ParsePeer(rule.From, namespace, direction, rule.Action)
 
 		// Parse the protocols for ingress
 		for _, generated := range generatedRules.Ingress {
-			for _, protocol := range rule.Protocols {
+			for _, protocol := range rule. {
 				tempRule := generated
-				tempRule.L4proto = protocol
-				tempRule.Dport = protocol.Destination
-				tempRule.Sport = protocol.Source
+				tempRule.Dport = protocol.
 				parsed.Ingress = append(parsed.Ingress, tempRule)
 			}
 		}
 
 		// parse the protocol for egress
 		for _, generated := range generatedRules.Egress {
-			for _, protocol := range rule.Protocols {
+			for _, protocol := range rule.Protocol {
 				tempRule := generated
-				tempRule.L4proto = protocol
-				tempRule.Dport = protocol.Destination
-				tempRule.Sport = protocol.Source
+				tempRule.Sport = protocol.Ports.Destination
 				parsed.Egress = append(parsed.Egress, tempRule)
 			}
 		}
@@ -271,13 +267,13 @@ func (p *PnpParser) ParsePeer(peer v1beta.PolycubeNetworkPolicyPeer, namespace, 
 
 	//	The World?
 	if peer.Peer == v1beta.WorldPeer {
-		return p.ParseWolrd(peer.WithIP, direction, action)
+		return p.ParseWorld(peer.WithIP, direction, action)
 	}
 
 	return pcn_types.ParsedRules{}
 }
 
-func (p *PnpParser) ParseWolrd(ips v1beta.PolycubeNetworkPolicyWithIP, direction string, action v1beta.PolycubeNetworkPolicyRuleAction) pcn_types.ParsedRules {
+func (p *PnpParser) ParseWorld(ips v1beta.PolycubeNetworkPolicyWithIP, direction string, action v1beta.PolycubeNetworkPolicyRuleAction) pcn_types.ParsedRules {
 	parsed := pcn_types.ParsedRules{
 		Ingress: []k8sfirewall.ChainRule{},
 		Egress:  []k8sfirewall.ChainRule{},
@@ -285,56 +281,16 @@ func (p *PnpParser) ParseWolrd(ips v1beta.PolycubeNetworkPolicyWithIP, direction
 
 	//	The list
 	for _, cidr := range ips.List {
-		result := pcn_types.ParsedRules{}
+		rules := pcn_types.ParsedRules{}
+
 		if direction == "ingress" {
-			if action == v1beta.AllowAction {
-				parsed.Ingress = append(parsed.Ingress, k8sfirewall.ChainRule{
-					Src:       cidr,
-					Action:    "forward",
-					Conntrack: pcn_types.ConnTrackNew,
-				})
-				parsed.Ingress = append(parsed.Ingress, k8sfirewall.ChainRule{
-					Src:       cidr,
-					Action:    "forward",
-					Conntrack: pcn_types.ConnTrackEstablished,
-				})
-				parsed.Egress = append(parsed.Egress, k8sfirewall.ChainRule{
-					Dst:       cidr,
-					Action:    "forward",
-					Conntrack: pcn_types.ConnTrackEstablished,
-				})
-			} else {
-				parsed.Ingress = append(parsed.Ingress, k8sfirewall.ChainRule{
-					Src:       cidr,
-					Action:    "drop",
-					Conntrack: pcn_types.ConnTrackNew,
-				})
-			}
+			rules = BuildEgressConnectionTemplates(cidr, string(action))
 		} else {
-			if action == v1beta.AllowAction {
-				parsed.Egress = append(parsed.Egress, k8sfirewall.ChainRule{
-					Dst:       cidr,
-					Action:    "forward",
-					Conntrack: pcn_types.ConnTrackNew,
-				})
-				parsed.Egress = append(parsed.Egress, k8sfirewall.ChainRule{
-					Dst:       cidr,
-					Action:    "forward",
-					Conntrack: pcn_types.ConnTrackEstablished,
-				})
-				parsed.Ingress = append(parsed.Ingress, k8sfirewall.ChainRule{
-					Src:       cidr,
-					Action:    "forward",
-					Conntrack: pcn_types.ConnTrackEstablished,
-				})
-			} else {
-				parsed.Egress = append(parsed.Egress, k8sfirewall.ChainRule{
-					Dst:       cidr,
-					Action:    "drop",
-					Conntrack: pcn_types.ConnTrackNew,
-				})
-			}
+			rules = BuildIngressConnectionTemplates(cidr, string(action))
 		}
+
+		parsed.Ingress = append(parsed.Ingress, rules.Ingress)
+		parsed.Egress = append(parsed.Egress, rules.Egress)
 	}
 
 	return parsed
@@ -367,55 +323,16 @@ func (p *PnpParser) ParsePod(peer v1beta.PolycubeNetworkPolicyPeer, namespace, d
 
 	//	Now build the pods
 	for _, pod := range podsFound {
+		rules := pcn_types.ParsedRules{}
+
 		if direction == "ingress" {
-			if action == v1beta.AllowAction {
-				parsed.Ingress = append(parsed.Ingress, k8sfirewall.ChainRule{
-					Src:       pod.Status.PodIP,
-					Action:    "forward",
-					Conntrack: pcn_types.ConnTrackNew,
-				})
-				parsed.Ingress = append(parsed.Ingress, k8sfirewall.ChainRule{
-					Src:       pod.Status.PodIP,
-					Action:    "forward",
-					Conntrack: pcn_types.ConnTrackEstablished,
-				})
-				parsed.Egress = append(parsed.Egress, k8sfirewall.ChainRule{
-					Dst:       pod.Status.PodIP,
-					Action:    "forward",
-					Conntrack: pcn_types.ConnTrackEstablished,
-				})
-			} else {
-				parsed.Ingress = append(parsed.Ingress, k8sfirewall.ChainRule{
-					Src:       pod.Status.PodIP,
-					Action:    "drop",
-					Conntrack: pcn_types.ConnTrackNew,
-				})
-			}
+			rules = BuildEgressConnectionTemplates(cidr, string(action))
 		} else {
-			if action == v1beta.AllowAction {
-				parsed.Egress = append(parsed.Egress, k8sfirewall.ChainRule{
-					Dst:       pod.Status.PodIP,
-					Action:    "forward",
-					Conntrack: pcn_types.ConnTrackNew,
-				})
-				parsed.Egress = append(parsed.Egress, k8sfirewall.ChainRule{
-					Dst:       pod.Status.PodIP,
-					Action:    "forward",
-					Conntrack: pcn_types.ConnTrackEstablished,
-				})
-				parsed.Ingress = append(parsed.Ingress, k8sfirewall.ChainRule{
-					Src:       pod.Status.PodIP,
-					Action:    "forward",
-					Conntrack: pcn_types.ConnTrackEstablished,
-				})
-			} else {
-				parsed.Egress = append(parsed.Egress, k8sfirewall.ChainRule{
-					Dst:       pod.Status.PodIP,
-					Action:    "drop",
-					Conntrack: pcn_types.ConnTrackNew,
-				})
-			}
+			rules = BuildIngressConnectionTemplates(cidr, string(action))
 		}
+
+		parsed.Ingress = append(parsed.Ingress, rules.Ingress)
+		parsed.Egress = append(parsed.Egress, rules.Egress)
 	}
 
 	return parsed
@@ -823,8 +740,41 @@ func (p *PnpParser) buildPodQueries(podSelector, namespaceSelector map[string]st
 	return false
 }*/
 
+// BuildIncomingConnectionTemplate builds incoming connection templates without using ports
+
 // GetConnectionTemplate builds a rule template based on connections
-func (p *PnpParser) GetConnectionTemplate(direction, src, dst, action string /*, ports []pcn_types.ProtoPort*/) pcn_types.ParsedRules {
+/*func (p *PnpParser) GetConnectionTemplate(direction, src, dst, action string ) pcn_types.ParsedRules {
+
+	if direction == "ingress" {
+
+		} else {
+			if action == v1beta.AllowAction {
+				parsed.Egress = append(parsed.Egress, k8sfirewall.ChainRule{
+					Src:       cidr,
+					Action:    "forward",
+					Conntrack: pcn_types.ConnTrackNew,
+				})
+				parsed.Egress = append(parsed.Egress, k8sfirewall.ChainRule{
+					Src:       cidr,
+					Action:    "forward",
+					Conntrack: pcn_types.ConnTrackEstablished,
+				})
+				parsed.Ingress = append(parsed.Ingress, k8sfirewall.ChainRule{
+					Dst:       cidr,
+					Action:    "forward",
+					Conntrack: pcn_types.ConnTrackEstablished,
+				})
+			} else {
+				parsed.Egress = append(parsed.Egress, k8sfirewall.ChainRule{
+					Src:       cidr,
+					Action:    "drop",
+					Conntrack: pcn_types.ConnTrackNew,
+				})
+			}
+		}
+	}
+
+
 
 	twoRules := make([]k8sfirewall.ChainRule, 2)
 	oneRule := make([]k8sfirewall.ChainRule, 1)
@@ -850,10 +800,7 @@ func (p *PnpParser) GetConnectionTemplate(direction, src, dst, action string /*,
 
 	if direction == "ingress" {
 
-		/*if len(ports) > 0 {
-			withPorts := p.insertPorts(twoRules, oneRule, ports)
-			twoRules, oneRule = withPorts.Ingress, withPorts.Egress
-		}*/
+
 
 		return pcn_types.ParsedRules{
 			Ingress: twoRules,
@@ -861,17 +808,11 @@ func (p *PnpParser) GetConnectionTemplate(direction, src, dst, action string /*,
 		}
 	}
 
-	/*if len(ports) > 0 {
-		withPorts := p.insertPorts(oneRule, twoRules, ports)
-		oneRule, twoRules = withPorts.Ingress, withPorts.Egress
-	}*/
-
 	return pcn_types.ParsedRules{
 		Ingress: oneRule,
 		Egress:  twoRules,
 	}
-
-}
+}*/
 
 //	buildActionKey returns a key to be used in the firewall actions (to know how they should react to a pod event)
 func (p *PnpParser) buildActionKey(podLabels, nsLabels map[string]string, nsName string) string {
