@@ -56,7 +56,11 @@ func (in *PolycubeNetworkPolicy) DeepCopyObject() runtime.Object {
 func (in *PolycubeNetworkPolicyEgressRule) DeepCopyInto(out *PolycubeNetworkPolicyEgressRule) {
 	*out = *in
 	in.To.DeepCopyInto(&out.To)
-	out.Ports = in.Ports
+	if in.Protocols != nil {
+		in, out := &in.Protocols, &out.Protocols
+		*out = make([]PolycubeNetworkPolicyProtocolContainer, len(*in))
+		copy(*out, *in)
+	}
 	if in.TCPFlags != nil {
 		in, out := &in.TCPFlags, &out.TCPFlags
 		*out = make([]PolycubeNetworkPolicyTCPFlag, len(*in))
