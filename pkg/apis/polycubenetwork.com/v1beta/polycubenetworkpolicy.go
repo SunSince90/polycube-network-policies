@@ -160,8 +160,8 @@ const (
 // PolycubeNetworkPolicyNamespaceSelector is a selector for namespaces
 type PolycubeNetworkPolicyNamespaceSelector struct {
 	// +optional
-	// WithName is the name of the namespace
-	WithName string `json:"withName,omitempty"`
+	// WithName is a list of the names of the namespace
+	WithNames []string `json:"withNames,omitempty"`
 	// +optional
 	// WithLabels is the namespace's labels
 	WithLabels map[string]string `json:"withLabels,omitempty"`

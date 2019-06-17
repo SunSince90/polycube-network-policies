@@ -10,7 +10,7 @@ import (
 	"github.com/SunSince90/polycube-network-policies/controller"
 	pnp_clientset "github.com/SunSince90/polycube-network-policies/pkg/client/clientset/versioned"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/clientcmd" 
 )
 
 func getKubernetesClient() (kubernetes.Interface, pnp_clientset.Interface) {

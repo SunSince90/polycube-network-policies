@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"github.com/SunSince90/polycube-network-policies/pkg/apis/polycubenetwork.com/v1beta"
+	"k8s.io/client-go/kubernetes"
 
 	//"fmt"
-	"sort"
-	"strings"
+
 	"sync"
 
 	pcn_controllers "github.com/SunSince90/polycube/src/components/k8s/pcn_k8s/controllers"
@@ -16,14 +16,12 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	//core_v1 "k8s.io/api/core/v1"
-	networking_v1 "k8s.io/api/networking/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // PolycubeNetworkPolicyParser is the polycube network policy parser
 type PolycubeNetworkPolicyParser interface {
 	ParseRules(v1beta.PolycubeNetworkPolicyIngressRuleContainer, v1beta.PolycubeNetworkPolicyEgressRuleContainer, string) pcn_types.ParsedRules
-	ParseIngress([]v1beta.PolycubeNetworkPolicyIngressRule, string) pcn_types.ParsedRules
+	ParseIngress(v1beta.PolycubeNetworkPolicyIngressRuleContainer, string) pcn_types.ParsedRules
 	/*ParseEgress([]v1beta.PolycubeNetworkPolicyEgressRule, string) pcn_types.ParsedRules
 	ParseIPBlock(*networking_v1.IPBlock, string) pcn_types.ParsedRules
 	ParsePorts([]networking_v1.NetworkPolicyPort) []pcn_types.ProtoPort
@@ -38,13 +36,15 @@ type PnpParser struct {
 	podController      pcn_controllers.PodController
 	supportedProtocols string
 	log                *log.Logger
+	clientset          kubernetes.Interface
 }
 
-// newPolycubePolicyParser starts a new parser
-func newPolycubePolicyParser(podController pcn_controllers.PodController) PolycubeNetworkPolicyParser {
+// NewPolycubePolicyParser starts a new parser
+func NewPolycubePolicyParser(clientset kubernetes.Interface, podController pcn_controllers.PodController) PolycubeNetworkPolicyParser {
 	return &PnpParser{
 		podController: podController,
 		log:           log.New(),
+		clientset:     clientset,
 	}
 }
 
@@ -125,9 +125,9 @@ func (p *PnpParser) ParseIngress(ingress v1beta.PolycubeNetworkPolicyIngressRule
 
 	//	Drop all?
 	if ingress.DropAll != nil && *ingress.DropAll == true {
-		parsed.Egress = append(parsed.Egress, k8sfirewall.ChainRule{
+		/*parsed.Egress = append(parsed.Egress, k8sfirewall.ChainRule{
 			Action: pcn_types.ActionDrop,
-		})
+		})*/
 
 		return parsed
 	}
@@ -143,7 +143,10 @@ func (p *PnpParser) ParseIngress(ingress v1beta.PolycubeNetworkPolicyIngressRule
 	for _, rule := range ingress.Rules {
 
 		//	Parse the peer
-		generatedRules := p.ParsePeer(rule.From, namespace, direction, rule.Action)
+		generatedRules, _ := p.ParsePeer(rule.From, namespace, direction, rule.Action)
+
+		//	No need to check for err here: if err happened then generatedRules is empty, so the loops above wouldn't start.
+		//	Let's consider this a "graceful" break
 
 		// Parse the protocols for ingress
 		for _, generated := range generatedRules.Ingress {
@@ -198,9 +201,9 @@ func (p *PnpParser) ParseEgress(egress v1beta.PolycubeNetworkPolicyEgressRuleCon
 
 	//	Drop all?
 	if egress.DropAll != nil && *egress.DropAll == true {
-		parsed.Ingress = append(parsed.Ingress, k8sfirewall.ChainRule{
+		/*parsed.Ingress = append(parsed.Ingress, k8sfirewall.ChainRule{
 			Action: pcn_types.ActionDrop,
-		})
+		})*/
 
 		return parsed
 	}
@@ -216,20 +219,22 @@ func (p *PnpParser) ParseEgress(egress v1beta.PolycubeNetworkPolicyEgressRuleCon
 	for _, rule := range egress.Rules {
 
 		//	Parse the peer
-		generatedRules := p.ParsePeer(rule.From, namespace, direction, rule.Action)
+		generatedRules, _ := p.ParsePeer(rule.To, namespace, direction, rule.Action)
+
+		//	Same as for ParseIngress...
 
 		// Parse the protocols for ingress
 		for _, generated := range generatedRules.Ingress {
-			for _, protocol := range rule. {
+			for _, protocol := range rule.Protocols {
 				tempRule := generated
-				tempRule.Dport = protocol.
+				tempRule.Dport = protocol.Ports.Destination
 				parsed.Ingress = append(parsed.Ingress, tempRule)
 			}
 		}
 
 		// parse the protocol for egress
 		for _, generated := range generatedRules.Egress {
-			for _, protocol := range rule.Protocol {
+			for _, protocol := range rule.Protocols {
 				tempRule := generated
 				tempRule.Sport = protocol.Ports.Destination
 				parsed.Egress = append(parsed.Egress, tempRule)
@@ -240,39 +245,64 @@ func (p *PnpParser) ParseEgress(egress v1beta.PolycubeNetworkPolicyEgressRuleCon
 	return parsed
 }
 
-func (p *PnpParser) ParsePeer(peer v1beta.PolycubeNetworkPolicyPeer, namespace, direction string, action v1beta.PolycubeNetworkPolicyRuleAction) pcn_types.ParsedRules {
+// ParsePeer is a convenient method to parse the peer. Works for both ingress and egress connections
+func (p *PnpParser) ParsePeer(peer v1beta.PolycubeNetworkPolicyPeer, namespace, direction string, action v1beta.PolycubeNetworkPolicyRuleAction) (pcn_types.ParsedRules, error) {
 
 	//	Pod?
 	if peer.Peer == v1beta.PodPeer {
-		result, err := p.ParsePod(peer, namespace, direction, action)
-		if err != nil {
-			log.Errorln("Could not parse pod correctly")
-		}
+		return p.ParsePod(peer, namespace, direction, action)
 	}
 
 	//	Deployment
 	if peer.Peer == v1beta.DeploymentPeer {
-		find := v1beta.PolycubeNetworkPolicyPeer{
-			Peer: v1beta.PodPeer,
-			WithLabels: map[string]string{
-				"polycubenetwork.com/deployment": peer.WithName,
-			},
-			OnNamespace: peer.OnNamespace,
+		nsList := []string{}
+
+		// put the list of namespaces
+		if peer.OnNamespace != nil {
+			namespaces, err := getNamespaceNames(p.clientset, peer.OnNamespace.WithLabels)
+			if err != nil {
+				log.Errorln("Error while trying to get the namespaces list. Going to stop with this rule.")
+				return pcn_types.ParsedRules{}, nil
+			}
+
+			nsList = append(nsList, namespaces...)
+		} else {
+			nsList = append(nsList, namespace)
 		}
-		result, err := p.ParsePod(find, namespace, direction, action)
-		if err != nil {
-			log.Errorln("Could not parse pod correctly")
+
+		//	Now do this for each namespace found
+		parsed := pcn_types.ParsedRules{}
+
+		for _, ns := range nsList {
+			templateLabels := getTemplateLabels(p.clientset, peer.WithName, namespace)
+			//	No need to add onNamespace in the fakePeer, as we already got them earlier
+			fakePeer := v1beta.PolycubeNetworkPolicyPeer{
+				Peer:       v1beta.PodPeer,
+				WithLabels: templateLabels,
+			}
+			result, err := p.ParsePod(fakePeer, ns, direction, action)
+			if err != nil {
+				log.Errorln("Could not parse pod template correctly:", fakePeer)
+
+				//	Just don't parse it
+				//return pcn_types.ParsedRules{}, err
+			} else {
+				parsed.Ingress = append(parsed.Ingress, result.Ingress...)
+				parsed.Egress = append(parsed.Egress, result.Egress...)
+			}
 		}
+		return parsed, nil
 	}
 
 	//	The World?
 	if peer.Peer == v1beta.WorldPeer {
-		return p.ParseWorld(peer.WithIP, direction, action)
+		return p.ParseWorld(peer.WithIP, direction, action), nil
 	}
 
-	return pcn_types.ParsedRules{}
+	return pcn_types.ParsedRules{}, nil
 }
 
+// ParseWorld parses world type peer
 func (p *PnpParser) ParseWorld(ips v1beta.PolycubeNetworkPolicyWithIP, direction string, action v1beta.PolycubeNetworkPolicyRuleAction) pcn_types.ParsedRules {
 	parsed := pcn_types.ParsedRules{
 		Ingress: []k8sfirewall.ChainRule{},
@@ -284,18 +314,19 @@ func (p *PnpParser) ParseWorld(ips v1beta.PolycubeNetworkPolicyWithIP, direction
 		rules := pcn_types.ParsedRules{}
 
 		if direction == "ingress" {
-			rules = BuildEgressConnectionTemplates(cidr, string(action))
+			rules = buildEgressConnectionTemplates(cidr, string(action))
 		} else {
-			rules = BuildIngressConnectionTemplates(cidr, string(action))
+			rules = buildIngressConnectionTemplates(cidr, string(action))
 		}
 
-		parsed.Ingress = append(parsed.Ingress, rules.Ingress)
-		parsed.Egress = append(parsed.Egress, rules.Egress)
+		parsed.Ingress = append(parsed.Ingress, rules.Ingress...)
+		parsed.Egress = append(parsed.Egress, rules.Egress...)
 	}
 
 	return parsed
 }
 
+// ParsePod parses pod type peer
 func (p *PnpParser) ParsePod(peer v1beta.PolycubeNetworkPolicyPeer, namespace, direction string, action v1beta.PolycubeNetworkPolicyRuleAction) (pcn_types.ParsedRules, error) {
 	parsed := pcn_types.ParsedRules{
 		Ingress: []k8sfirewall.ChainRule{},
@@ -326,16 +357,16 @@ func (p *PnpParser) ParsePod(peer v1beta.PolycubeNetworkPolicyPeer, namespace, d
 		rules := pcn_types.ParsedRules{}
 
 		if direction == "ingress" {
-			rules = BuildEgressConnectionTemplates(cidr, string(action))
+			rules = buildEgressConnectionTemplates(pod.Status.PodIP, string(action))
 		} else {
-			rules = BuildIngressConnectionTemplates(cidr, string(action))
+			rules = buildIngressConnectionTemplates(pod.Status.PodIP, string(action))
 		}
 
-		parsed.Ingress = append(parsed.Ingress, rules.Ingress)
-		parsed.Egress = append(parsed.Egress, rules.Egress)
+		parsed.Ingress = append(parsed.Ingress, rules.Ingress...)
+		parsed.Egress = append(parsed.Egress, rules.Egress...)
 	}
 
-	return parsed
+	return parsed, nil
 }
 
 // ParseEgress parses the Egress section of a policy
@@ -686,7 +717,7 @@ func (p *PnpParser) buildPodQueries(podSelector, namespaceSelector map[string]st
 		}
 	}
 
-	return queryPod, queryNs, nil
+	return queryPod, queryNs
 }
 
 // DoesPolicyAffectPod checks if the provided policy affects the provided pod, returning TRUE if it does
@@ -814,170 +845,117 @@ func (p *PnpParser) buildPodQueries(podSelector, namespaceSelector map[string]st
 	}
 }*/
 
-//	buildActionKey returns a key to be used in the firewall actions (to know how they should react to a pod event)
-func (p *PnpParser) buildActionKey(podLabels, nsLabels map[string]string, nsName string) string {
-	key := ""
-	//	NOTE: why do we sort keys? Because in go, iteration of a map is not order and not always fixed.
-	//	So, by ordering the alphabetically we have a guarantuee that this function always returns the same expected result.
-	//	BTW, pods and namespaces usally have very few keys (e.g.: including those appended by k8s as well, they should be less than 10)
-
-	//-------------------------------------
-	//	Namespace
-	//-------------------------------------
-
-	//	Namespace name always has precedence over labels
-	if len(nsName) > 0 {
-		key += "nsName:" + nsName
-	} else {
-
-		if len(nsLabels) > 0 {
-			key += "nsLabels:"
-
-			implodedLabels := []string{}
-			for k, v := range nsLabels {
-				implodedLabels = append(implodedLabels, k+"="+v)
-			}
-			sort.Strings(implodedLabels)
-			key += strings.Join(implodedLabels, ",")
-		} else {
-			key += "nsName:*"
-		}
-	}
-
-	key += "|"
-
-	//-------------------------------------
-	//	Pod
-	//-------------------------------------
-
-	//	Pod labels
-	key += "podLabels:"
-	if len(podLabels) < 1 {
-		key += "*"
-		return key
-	}
-
-	implodedLabels := []string{}
-	for k, v := range podLabels {
-		implodedLabels = append(implodedLabels, k+"="+v)
-	}
-	sort.Strings(implodedLabels)
-	key += strings.Join(implodedLabels, ",")
-
-	return key
-}
-
 // BuildActions builds actions that are going to be used by firewalls so they know how to react to pods.
-func (p *PnpParser) BuildActions(ingress []networking_v1.NetworkPolicyIngressRule, egress []networking_v1.NetworkPolicyEgressRule, currentNamespace string) []pcn_types.FirewallAction {
-	fwActions := []pcn_types.FirewallAction{}
-	var waitActions sync.WaitGroup
-	waitActions.Add(2)
+//func (p *PnpParser) BuildActions(ingress []networking_v1.NetworkPolicyIngressRule, egress []networking_v1.NetworkPolicyEgressRule, currentNamespace string) []pcn_types.FirewallAction {
+/*fwActions := []pcn_types.FirewallAction{}
+var waitActions sync.WaitGroup
+waitActions.Add(2)
 
-	selectorsChecker := func(podSelector, namespaceSelector *meta_v1.LabelSelector) (bool, map[string]string, map[string]string) {
-		//	Matchexpression is not supported
-		if (podSelector != nil && len(podSelector.MatchExpressions) > 0) ||
-			(namespaceSelector != nil && len(namespaceSelector.MatchExpressions) > 0) {
-			return false, nil, nil
-		}
-
-		//	If no selectors, then don't do anything
-		if podSelector == nil && namespaceSelector == nil {
-			return false, nil, nil
-		}
-
-		p := map[string]string{}
-		n := map[string]string{}
-		if podSelector != nil {
-			p = podSelector.MatchLabels
-		}
-
-		if namespaceSelector != nil {
-			n = namespaceSelector.MatchLabels
-		} else {
-			n = nil
-		}
-
-		return true, p, n
+selectorsChecker := func(podSelector, namespaceSelector *meta_v1.LabelSelector) (bool, map[string]string, map[string]string) {
+	//	Matchexpression is not supported
+	if (podSelector != nil && len(podSelector.MatchExpressions) > 0) ||
+		(namespaceSelector != nil && len(namespaceSelector.MatchExpressions) > 0) {
+		return false, nil, nil
 	}
 
-	//-------------------------------------
-	//	Ingress
-	//-------------------------------------
-	ingressActions := []pcn_types.FirewallAction{}
-	/*go func() {
-		defer waitActions.Done()
-		if ingress == nil {
-			return
-		}
+	//	If no selectors, then don't do anything
+	if podSelector == nil && namespaceSelector == nil {
+		return false, nil, nil
+	}
 
-		for _, i := range ingress {
+	p := map[string]string{}
+	n := map[string]string{}
+	if podSelector != nil {
+		p = podSelector.MatchLabels
+	}
 
-			ports := d.ParsePorts(i.Ports)
+	if namespaceSelector != nil {
+		n = namespaceSelector.MatchLabels
+	} else {
+		n = nil
+	}
 
-			for _, f := range i.From {
-				action := pcn_types.FirewallAction{}
+	return true, p, n
+}*/
 
-				ok, pod, ns := selectorsChecker(f.PodSelector, f.NamespaceSelector)
+//-------------------------------------
+//	Ingress
+//-------------------------------------
+//ingressActions := []pcn_types.FirewallAction{}
+/*go func() {
+	defer waitActions.Done()
+	if ingress == nil {
+		return
+	}
 
-				if ok {
+	for _, i := range ingress {
 
-					action.PodLabels = pod
-					action.NamespaceLabels = ns
-					if ns == nil {
-						action.NamespaceLabels = map[string]string{}
-						action.NamespaceName = currentNamespace
-					}
+		ports := d.ParsePorts(i.Ports)
 
-					action.Templates = d.GetConnectionTemplate("ingress", "", "", pcn_types.ActionForward, ports)
-					action.Key = d.buildActionKey(action.PodLabels, action.NamespaceLabels, action.NamespaceName)
-					ingressActions = append(ingressActions, action)
+		for _, f := range i.From {
+			action := pcn_types.FirewallAction{}
+
+			ok, pod, ns := selectorsChecker(f.PodSelector, f.NamespaceSelector)
+
+			if ok {
+
+				action.PodLabels = pod
+				action.NamespaceLabels = ns
+				if ns == nil {
+					action.NamespaceLabels = map[string]string{}
+					action.NamespaceName = currentNamespace
 				}
+
+				action.Templates = d.GetConnectionTemplate("ingress", "", "", pcn_types.ActionForward, ports)
+				action.Key = d.buildActionKey(action.PodLabels, action.NamespaceLabels, action.NamespaceName)
+				ingressActions = append(ingressActions, action)
 			}
 		}
-	}()*/
+	}
+}()*/
 
-	//-------------------------------------
-	//	Egress
-	//-------------------------------------
-	/*egressActions := []pcn_types.FirewallAction{}
-	go func() {
-		defer waitActions.Done()
-		if egress == nil {
-			return
-		}
+//-------------------------------------
+//	Egress
+//-------------------------------------
+/*egressActions := []pcn_types.FirewallAction{}
+go func() {
+	defer waitActions.Done()
+	if egress == nil {
+		return
+	}
 
-		for _, e := range egress {
+	for _, e := range egress {
 
-			ports := d.ParsePorts(e.Ports)
+		ports := d.ParsePorts(e.Ports)
 
-			for _, t := range e.To {
+		for _, t := range e.To {
 
-				action := pcn_types.FirewallAction{}
-				ok, pod, ns := selectorsChecker(t.PodSelector, t.NamespaceSelector)
+			action := pcn_types.FirewallAction{}
+			ok, pod, ns := selectorsChecker(t.PodSelector, t.NamespaceSelector)
 
-				if ok {
+			if ok {
 
-					action.PodLabels = pod
-					action.NamespaceLabels = ns
-					if ns == nil {
-						action.NamespaceLabels = map[string]string{}
-						action.NamespaceName = currentNamespace
-					}
-
-					action.Templates = d.GetConnectionTemplate("egress", "", "", pcn_types.ActionForward, ports)
-					action.Key = d.buildActionKey(action.PodLabels, action.NamespaceLabels, action.NamespaceName)
-					egressActions = append(egressActions, action)
+				action.PodLabels = pod
+				action.NamespaceLabels = ns
+				if ns == nil {
+					action.NamespaceLabels = map[string]string{}
+					action.NamespaceName = currentNamespace
 				}
+
+				action.Templates = d.GetConnectionTemplate("egress", "", "", pcn_types.ActionForward, ports)
+				action.Key = d.buildActionKey(action.PodLabels, action.NamespaceLabels, action.NamespaceName)
+				egressActions = append(egressActions, action)
 			}
 		}
-	}()*/
+	}
+}()*/
 
-	waitActions.Wait()
+//waitActions.Wait()
 
-	//fwActions = append(fwActions, ingressActions...)
-	//fwActions = append(fwActions, egressActions...)
-	return fwActions
-}
+//fwActions = append(fwActions, ingressActions...)
+//fwActions = append(fwActions, egressActions...)
+//return fwActions
+//}
 
 /*func (p *PnpParser) generateRulesForPod(podsFound []core_v1.Pod, pod *core_v1.Pod, generatedPorts []pcn_types.ProtoPort, direction string) pcn_types.ParsedRules {
 	generatedIngress := []k8sfirewall.ChainRule{}

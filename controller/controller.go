@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/SunSince90/polycube-network-policies/parser"
+
 	"github.com/SunSince90/polycube-network-policies/pkg/apis/polycubenetwork.com/v1beta"
 
 	log "github.com/Sirupsen/logrus"
@@ -194,11 +196,11 @@ func (c *PcnPolicyController) processNextItem() bool {
 	// a code path of successful queue key processing
 	if !exists {
 		c.logger.Infof("Controller.processNextItem: object deleted detected: %s", keyRaw)
-		treatObject(item)
+		c.treatObject(item)
 		c.queue.Forget(key)
 	} else {
 		c.logger.Infof("Controller.processNextItem: object created detected: %s", keyRaw)
-		treatObject(item)
+		c.treatObject(item)
 		c.queue.Forget(key)
 	}
 
@@ -206,11 +208,13 @@ func (c *PcnPolicyController) processNextItem() bool {
 	return true
 }
 
-func treatObject(temp interface{}) {
+func (c *PcnPolicyController) treatObject(temp interface{}) {
 	policy, ok := temp.(*v1beta.PolycubeNetworkPolicy)
 	if !ok {
 		log.Errorln("Error in casting policy!")
 	}
 
 	log.Printf("%+v\n", policy)
+
+	p := parser.NewPolycubePolicyParser(c.kclientset, nil)
 }
