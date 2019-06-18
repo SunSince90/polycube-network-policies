@@ -155,6 +155,7 @@ func (p *PnpParser) ParseIngress(ingress v1beta.PolycubeNetworkPolicyIngressRule
 				tempRule := generated
 				tempRule.Dport = protocol.Ports.Source
 				tempRule.Sport = protocol.Ports.Destination
+				tempRule.L4proto = string(protocol.Protocol)
 				parsed.Ingress = append(parsed.Ingress, tempRule)
 			}
 		}
@@ -165,6 +166,7 @@ func (p *PnpParser) ParseIngress(ingress v1beta.PolycubeNetworkPolicyIngressRule
 				tempRule := generated
 				tempRule.Sport = protocol.Ports.Source
 				tempRule.Dport = protocol.Ports.Destination
+				tempRule.L4proto = string(protocol.Protocol)
 				parsed.Egress = append(parsed.Egress, tempRule)
 			}
 		}
@@ -232,6 +234,7 @@ func (p *PnpParser) ParseEgress(egress v1beta.PolycubeNetworkPolicyEgressRuleCon
 				tempRule := generated
 				tempRule.Dport = protocol.Ports.Destination
 				tempRule.Sport = protocol.Ports.Source
+				tempRule.L4proto = string(protocol.Protocol)
 				parsed.Ingress = append(parsed.Ingress, tempRule)
 			}
 		}
@@ -242,6 +245,7 @@ func (p *PnpParser) ParseEgress(egress v1beta.PolycubeNetworkPolicyEgressRuleCon
 				tempRule := generated
 				tempRule.Sport = protocol.Ports.Destination
 				tempRule.Dport = protocol.Ports.Source
+				tempRule.L4proto = string(protocol.Protocol)
 				parsed.Egress = append(parsed.Egress, tempRule)
 			}
 		}
