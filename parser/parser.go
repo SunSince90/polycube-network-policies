@@ -287,9 +287,9 @@ func (p *PnpParser) ParseWorld(ips v1beta.PolycubeNetworkPolicyWithIP, direction
 		rules := pcn_types.ParsedRules{}
 
 		if direction == "ingress" {
-			rules = buildEgressConnectionTemplates(cidr, string(action))
-		} else {
 			rules = buildIngressConnectionTemplates(cidr, string(action))
+		} else {
+			rules = buildEgressConnectionTemplates(cidr, string(action))
 		}
 
 		parsed.Ingress = append(parsed.Ingress, rules.Ingress...)
@@ -343,9 +343,9 @@ func (p *PnpParser) ParsePod(peer v1beta.PolycubeNetworkPolicyPeer, namespace, d
 		rules := pcn_types.ParsedRules{}
 
 		if direction == "ingress" {
-			rules = buildEgressConnectionTemplates(pod.Status.PodIP, string(action))
-		} else {
 			rules = buildIngressConnectionTemplates(pod.Status.PodIP, string(action))
+		} else {
+			rules = buildEgressConnectionTemplates(pod.Status.PodIP, string(action))
 		}
 
 		parsed.Ingress = append(parsed.Ingress, rules.Ingress...)
