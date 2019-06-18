@@ -99,7 +99,7 @@ type PolycubeNetworkPolicyProtocolContainer struct {
 	// Ports is the container of the ports
 	Ports PolycubeNetworkPolicyPorts `json:"ports,omitempty"`
 	// Protocol is the l4 protocol
-	Protocol PolycubeNetworkPolicyProtocol
+	Protocol PolycubeNetworkPolicyProtocol `json:"protocol,omitempty"`
 }
 
 // PolycubeNetworkPolicyEgressRule the rule for egress
