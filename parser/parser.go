@@ -1,13 +1,13 @@
 package parser
 
 import (
-	controller "github.com/SunSince90/polycube-network-policies/controller"
 	"fmt"
 
-	"github.com/SunSince90/polycube-network-policies/pkg/apis/polycubenetwork.com/v1beta"
-	"k8s.io/client-go/kubernetes"
+	controller "github.com/SunSince90/polycube-network-policies/controller"
 
-	//"fmt" 
+	"github.com/SunSince90/polycube-network-policies/pkg/apis/polycubenetwork.com/v1beta"
+
+	//"fmt"
 
 	"sync"
 
@@ -30,22 +30,22 @@ type PolycubeNetworkPolicyParser interface {
 	BuildActions([]networking_v1.NetworkPolicyIngressRule, []networking_v1.NetworkPolicyEgressRule, string) []pcn_types.FirewallAction
 	GetConnectionTemplate(string, string, string, string, []pcn_types.ProtoPort) pcn_types.ParsedRules
 	DoesPolicyAffectPod(*networking_v1.NetworkPolicy, *core_v1.Pod) bool*/
-}  
+}
 
 // PnpParser is the implementation of the default parser
 type PnpParser struct {
-	podController      pcn_controllers.PodController
+	podController      controller.PodController
+	serviceController  controller.ServiceController
 	supportedProtocols string
 	log                *log.Logger
-	clientset          kubernetes.Interface
 }
 
 // NewPolycubePolicyParser starts a new parser
-func NewPolycubePolicyParser(clientset kubernetes.Interface, controller.PodController, controller.ServiceController) PolycubeNetworkPolicyParser {
+func NewPolycubePolicyParser(podController controller.PodController, serviceController controller.ServiceController) PolycubeNetworkPolicyParser {
 	return &PnpParser{
-		podController: podController,
-		log:           log.New(),
-		clientset:     clientset,
+		podController:     podController,
+		serviceController: serviceController,
+		log:               log.New(),
 	}
 }
 
@@ -154,6 +154,7 @@ func (p *PnpParser) ParseIngress(ingress v1beta.PolycubeNetworkPolicyIngressRule
 			for _, protocol := range rule.Protocols {
 				tempRule := generated
 				tempRule.Dport = protocol.Ports.Source
+				tempRule.Sport = protocol.Ports.Destination
 				parsed.Ingress = append(parsed.Ingress, tempRule)
 			}
 		}
@@ -163,6 +164,7 @@ func (p *PnpParser) ParseIngress(ingress v1beta.PolycubeNetworkPolicyIngressRule
 			for _, protocol := range rule.Protocols {
 				tempRule := generated
 				tempRule.Sport = protocol.Ports.Source
+				tempRule.Dport = protocol.Ports.Destination
 				parsed.Egress = append(parsed.Egress, tempRule)
 			}
 		}
@@ -229,6 +231,7 @@ func (p *PnpParser) ParseEgress(egress v1beta.PolycubeNetworkPolicyEgressRuleCon
 			for _, protocol := range rule.Protocols {
 				tempRule := generated
 				tempRule.Dport = protocol.Ports.Destination
+				tempRule.Sport = protocol.Ports.Source
 				parsed.Ingress = append(parsed.Ingress, tempRule)
 			}
 		}
@@ -238,6 +241,7 @@ func (p *PnpParser) ParseEgress(egress v1beta.PolycubeNetworkPolicyEgressRuleCon
 			for _, protocol := range rule.Protocols {
 				tempRule := generated
 				tempRule.Sport = protocol.Ports.Destination
+				tempRule.Dport = protocol.Ports.Source
 				parsed.Egress = append(parsed.Egress, tempRule)
 			}
 		}

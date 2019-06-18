@@ -8,6 +8,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 
 	"github.com/SunSince90/polycube-network-policies/controller"
+	"github.com/SunSince90/polycube-network-policies/parser"
 	"github.com/SunSince90/polycube-network-policies/pkg/apis/polycubenetwork.com/v1beta"
 	pnp_clientset "github.com/SunSince90/polycube-network-policies/pkg/client/clientset/versioned"
 	"k8s.io/client-go/kubernetes"
@@ -43,9 +44,19 @@ func main() {
 	log.Infoln("Hello, World!")
 
 	kclientset, pclientset := getKubernetesClient()
-	c := controller.NewPcnPolicyController(kclientset, pclientset)
 	p := controller.NewPodController(kclientset)
 	s := controller.NewServiceController(kclientset)
+
+	// use a channel to synchronize the finalization for a graceful shutdown
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	// run the controller loop to process items
+	go p.Run()
+	go s.Run()
+	parser := parser.NewPolycubePolicyParser(p, s)
+	c := controller.NewPcnPolicyController(kclientset, pclientset)
+	go c.Run(stopCh)
 	c.AddUpdateFunc("new", func(item interface{}) {
 		policy, ok := item.(*v1beta.PolycubeNetworkPolicy)
 		if !ok {
@@ -54,15 +65,6 @@ func main() {
 
 		log.Printf("%+v\n", policy)
 	})
-	// use a channel to synchronize the finalization for a graceful shutdown
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
-	// run the controller loop to process items
-	go c.Run(stopCh)
-
-	go p.Run()
-	go s.Run()
 
 	// use a channel to handle OS signals to terminate and gracefully shut
 	// down processing
