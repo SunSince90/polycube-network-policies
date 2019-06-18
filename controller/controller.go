@@ -23,6 +23,9 @@ type PcnPolicyController struct {
 	kclientset kubernetes.Interface
 	queue      workqueue.RateLimitingInterface
 	informer   cache.SharedIndexInformer
+	upd        func(interface{})
+	new        func(interface{})
+	del        func(interface{})
 	//handler    Handler
 }
 
@@ -94,6 +97,18 @@ func NewPcnPolicyController(kclientset kubernetes.Interface, pclientset pnp_clie
 	}
 
 	return &controller
+}
+
+func (c *PcnPolicyController) AddUpdateFunc(t string, temp func(interface{})) {
+	switch t {
+	default:
+	case "new":
+		c.new = temp
+	case "update":
+		c.upd = temp
+	case "del":
+		c.del = temp
+	}
 }
 
 // Run is the main path of execution for the controller loop
@@ -192,11 +207,15 @@ func (c *PcnPolicyController) processNextItem() bool {
 	// a code path of successful queue key processing
 	if !exists {
 		c.logger.Infof("Controller.processNextItem: object deleted detected: %s", keyRaw)
-		//c.treatObject(item)
+		if c.new != nil {
+			c.new(item)
+		}
 		c.queue.Forget(key)
 	} else {
 		c.logger.Infof("Controller.processNextItem: object created detected: %s", keyRaw)
-		//c.treatObject(item)
+		if c.new != nil {
+			c.new(item)
+		}
 		c.queue.Forget(key)
 	}
 

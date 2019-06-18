@@ -8,6 +8,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 
 	"github.com/SunSince90/polycube-network-policies/controller"
+	"github.com/SunSince90/polycube-network-policies/pkg/apis/polycubenetwork.com/v1beta"
 	pnp_clientset "github.com/SunSince90/polycube-network-policies/pkg/client/clientset/versioned"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -43,6 +44,14 @@ func main() {
 
 	kclientset, pclientset := getKubernetesClient()
 	c := controller.NewPcnPolicyController(kclientset, pclientset)
+	c.AddUpdateFunc("new", func(item interface{}) {
+		policy, ok := item.(*v1beta.PolycubeNetworkPolicy)
+		if !ok {
+			log.Errorln("Error in casting policy!")
+		}
+
+		log.Printf("%+v\n", policy)
+	})
 	// use a channel to synchronize the finalization for a graceful shutdown
 	stopCh := make(chan struct{})
 	defer close(stopCh)
