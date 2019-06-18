@@ -10,7 +10,7 @@ import (
 	"github.com/SunSince90/polycube-network-policies/controller"
 	pnp_clientset "github.com/SunSince90/polycube-network-policies/pkg/client/clientset/versioned"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd" 
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 func getKubernetesClient() (kubernetes.Interface, pnp_clientset.Interface) {
@@ -43,7 +43,6 @@ func main() {
 
 	kclientset, pclientset := getKubernetesClient()
 	c := controller.NewPcnPolicyController(kclientset, pclientset)
-
 	// use a channel to synchronize the finalization for a graceful shutdown
 	stopCh := make(chan struct{})
 	defer close(stopCh)

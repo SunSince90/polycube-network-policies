@@ -20,7 +20,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	typed_core_v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
-	workqueue "k8s.io/client-go/util/workqueue" 
+	workqueue "k8s.io/client-go/util/workqueue"
 )
 
 // ServiceController is the interface of the service controller
@@ -33,16 +33,16 @@ type ServiceController interface {
 
 // PcnServiceController is the implementation of the Service controller
 type PcnServiceController struct {
-	clientset    kubernetes.Interface
-	queue        workqueue.RateLimitingInterface
-	informer     cache.SharedIndexInformer
-	startedOn    time.Time
-	dispatchers  EventDispatchersContainer
-	stopCh       chan struct{}
-	maxRetries   int
-	logBy        string 
-	lock         sync.Mutex
-	nsInterface  typed_core_v1.NamespaceInterface 
+	clientset   kubernetes.Interface
+	queue       workqueue.RateLimitingInterface
+	informer    cache.SharedIndexInformer
+	startedOn   time.Time
+	dispatchers EventDispatchersContainer
+	stopCh      chan struct{}
+	maxRetries  int
+	logBy       string
+	lock        sync.Mutex
+	nsInterface typed_core_v1.NamespaceInterface
 }
 
 // NewServiceController will start a new Service controller
@@ -123,22 +123,22 @@ func NewServiceController(clientset kubernetes.Interface) ServiceController {
 
 	//	If namespace controller is nil, we're going to use it like this.
 	var nsInterface typed_core_v1.NamespaceInterface
-	if nsController == nil {
-		l.Infoln("No namespace controller provided. Going to use a light implementation.")
-		nsInterface = clientset.CoreV1().Namespaces()
-	}
+	//if nsController == nil {
+	l.Infoln("No namespace controller provided. Going to use a light implementation.")
+	nsInterface = clientset.CoreV1().Namespaces()
+	//}
 
 	//	Everything set up, return the controller
 	return &PcnServiceController{
-		nsController: nsController,
-		clientset:    clientset,
-		queue:        queue,
-		informer:     informer,
-		dispatchers:  dispatchers,
-		logBy:        logBy,
-		maxRetries:   maxRetries,
-		stopCh:       make(chan struct{}),
-		nsInterface:  nsInterface,
+		//nsController: nsController,
+		clientset:   clientset,
+		queue:       queue,
+		informer:    informer,
+		dispatchers: dispatchers,
+		logBy:       logBy,
+		maxRetries:  maxRetries,
+		stopCh:      make(chan struct{}),
+		nsInterface: nsInterface,
 	}
 }
 
@@ -258,11 +258,11 @@ func (s *PcnServiceController) process(event pcn_types.Event) error {
 	switch event.Type {
 
 	case pcn_types.New:
-		s.dispatchers.new.Dispatch(pod)
+		s.dispatchers.new.Dispatch(service)
 	case pcn_types.Update:
-		s.dispatchers.update.Dispatch(pod)
+		s.dispatchers.update.Dispatch(service)
 	case pcn_types.Delete:
-		s.dispatchers.delete.Dispatch(pod)
+		s.dispatchers.delete.Dispatch(service)
 	}
 
 	return nil
@@ -274,7 +274,7 @@ func (s *PcnServiceController) Stop() {
 	l.WithFields(log.Fields{"by": s.logBy, "method": "Stop()"})
 
 	//	Make them know that exit has been requested
-	close(p.stopCh)
+	close(s.stopCh)
 
 	//	Shutdown the queue, making the worker unblock
 	s.queue.ShutDown()
@@ -296,14 +296,14 @@ func (s *PcnServiceController) Subscribe(event pcn_types.EventType, spec pcn_typ
 		service := item.(*core_v1.Service)
 
 		//	Does this pod satisfies the conditions?
-		if !s.serviceMeetsCriteria(service, pec, namespace) {
+		if !s.serviceMeetsCriteria(service, spec, namespace) {
 			return
 		}
 
 		//	Then, execute the consumer in a separate thread.
 		//	NOTE: this step can also be done in the event dispatcher, but I want it to make them oblivious of the type they're handling.
 		//	This way, the event dispatcher is as general as possible (also, it is not their concern to cast objects.)
-		go consumer(pod)
+		go consumer(service)
 	})
 
 	//	What event are you subscribing to?
@@ -394,9 +394,9 @@ func (s *PcnServiceController) serviceMeetsCriteria(service *core_v1.Service, sp
 	//-------------------------------------
 	//	The Service
 	//-------------------------------------
-	
+
 	// The name
-	if len(spec.Name) > 0 && service.Name != spec.Name{
+	if len(spec.Name) > 0 && service.Name != spec.Name {
 		return false
 	}
 
@@ -462,11 +462,9 @@ func (s *PcnServiceController) GetServices(queryService pcn_types.ObjectQuery, q
 
 		//	Loop through all interested namespaces
 		for namespace := range ns {
-			lister, err := s.clientset.CoreV1().Service(namespace).List(listOptions)
+			lister, err := s.clientset.CoreV1().Services(namespace).List(listOptions)
 			if err == nil {
-						list = append(list, currentService)
-
-				}
+				list = append(list, lister.Items...)
 			} else {
 				//return []core_v1.Service, err
 				//	Just skip this namespace.
@@ -544,7 +542,7 @@ func (s *PcnServiceController) getNamespaces(query pcn_types.ObjectQuery) ([]cor
 			listOptions.FieldSelector = "metadata.name=" + name
 		}
 
-		lister, err := p.nsInterface.List(listOptions)
+		lister, err := s.nsInterface.List(listOptions)
 		return lister.Items, err
 	}
 
@@ -557,10 +555,10 @@ func (s *PcnServiceController) getNamespaces(query pcn_types.ObjectQuery) ([]cor
 			return []core_v1.Namespace{}, errors.New("Namespace labels is nil")
 		}
 
-		lister, err := p.nsInterface.List(meta_v1.ListOptions{
+		lister, err := s.nsInterface.List(meta_v1.ListOptions{
 			LabelSelector: implodeLabels(labels),
 		})
- 
+
 		return lister.Items, err
 	}
 
@@ -573,4 +571,4 @@ func (s *PcnServiceController) getNamespaces(query pcn_types.ObjectQuery) ([]cor
 	default:
 		return []core_v1.Namespace{}, errors.New("Unrecognized namespace query")
 	}
-}  
+}

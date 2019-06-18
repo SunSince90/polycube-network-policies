@@ -33,22 +33,22 @@ type PodController interface {
 
 // PcnPodController is the implementation of the pod controller
 type PcnPodController struct {
-	nsController NamespaceController
-	clientset    kubernetes.Interface
-	queue        workqueue.RateLimitingInterface
-	informer     cache.SharedIndexInformer
-	startedOn    time.Time
-	dispatchers  EventDispatchersContainer
-	stopCh       chan struct{}
-	maxRetries   int
-	logBy        string
-	pods         map[string]*pcn_types.Pod
-	lock         sync.Mutex
-	nsInterface  typed_core_v1.NamespaceInterface
+	//nsController NamespaceController
+	clientset   kubernetes.Interface
+	queue       workqueue.RateLimitingInterface
+	informer    cache.SharedIndexInformer
+	startedOn   time.Time
+	dispatchers EventDispatchersContainer
+	stopCh      chan struct{}
+	maxRetries  int
+	logBy       string
+	pods        map[string]*pcn_types.Pod
+	lock        sync.Mutex
+	nsInterface typed_core_v1.NamespaceInterface
 }
 
 // NewPodController will start a new pod controller
-func NewPodController(clientset kubernetes.Interface, nsController NamespaceController) PodController {
+func NewPodController(clientset kubernetes.Interface) PodController {
 	l := log.NewEntry(log.New())
 	l.WithFields(log.Fields{"by": "Pod Controller", "method": "NewPodController()"})
 
@@ -125,23 +125,23 @@ func NewPodController(clientset kubernetes.Interface, nsController NamespaceCont
 
 	//	If namespace controller is nil, we're going to use it like this.
 	var nsInterface typed_core_v1.NamespaceInterface
-	if nsController == nil {
-		l.Infoln("No namespace controller provided. Going to use a light implementation.")
-		nsInterface = clientset.CoreV1().Namespaces()
-	}
+	//if nsController == nil {
+	l.Infoln("No namespace controller provided. Going to use a light implementation.")
+	nsInterface = clientset.CoreV1().Namespaces()
+	//}
 
 	//	Everything set up, return the controller
 	return &PcnPodController{
-		nsController: nsController,
-		clientset:    clientset,
-		queue:        queue,
-		informer:     informer,
-		dispatchers:  dispatchers,
-		logBy:        logBy,
-		maxRetries:   maxRetries,
-		stopCh:       make(chan struct{}),
-		pods:         map[string]*pcn_types.Pod{},
-		nsInterface:  nsInterface,
+		//nsController: nsController,
+		clientset:   clientset,
+		queue:       queue,
+		informer:    informer,
+		dispatchers: dispatchers,
+		logBy:       logBy,
+		maxRetries:  maxRetries,
+		stopCh:      make(chan struct{}),
+		pods:        map[string]*pcn_types.Pod{},
+		nsInterface: nsInterface,
 	}
 }
 
@@ -586,9 +586,9 @@ func (p *PcnPodController) GetPods(queryPod pcn_types.ObjectQuery, queryNs pcn_t
 func (p *PcnPodController) getNamespaces(query pcn_types.ObjectQuery) ([]core_v1.Namespace, error) {
 
 	// Use the external namespace controller, if available
-	if p.nsController != nil {
-		return p.nsController.GetNamespaces(query)
-	}
+	//if p.nsController != nil {
+	//return p.nsController.GetNamespaces(query)
+	//}
 
 	//-------------------------------------
 	//	Find by name
