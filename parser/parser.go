@@ -1,20 +1,21 @@
 package parser
 
 import (
+	controller "github.com/SunSince90/polycube-network-policies/controller"
 	"fmt"
 
 	"github.com/SunSince90/polycube-network-policies/pkg/apis/polycubenetwork.com/v1beta"
 	"k8s.io/client-go/kubernetes"
 
-	//"fmt"
+	//"fmt" 
 
 	"sync"
 
-	pcn_controllers "github.com/SunSince90/polycube/src/components/k8s/pcn_k8s/controllers"
+	//pcn_controllers "github.com/SunSince90/polycube/src/components/k8s/pcn_k8s/controllers"
 	pcn_types "github.com/SunSince90/polycube/src/components/k8s/pcn_k8s/types"
 	k8sfirewall "github.com/SunSince90/polycube/src/components/k8s/utils/k8sfirewall"
 
-	log "github.com/sirupsen/logrus"
+	log "github.com/Sirupsen/logrus"
 	core_v1 "k8s.io/api/core/v1"
 )
 
@@ -29,7 +30,7 @@ type PolycubeNetworkPolicyParser interface {
 	BuildActions([]networking_v1.NetworkPolicyIngressRule, []networking_v1.NetworkPolicyEgressRule, string) []pcn_types.FirewallAction
 	GetConnectionTemplate(string, string, string, string, []pcn_types.ProtoPort) pcn_types.ParsedRules
 	DoesPolicyAffectPod(*networking_v1.NetworkPolicy, *core_v1.Pod) bool*/
-}
+}  
 
 // PnpParser is the implementation of the default parser
 type PnpParser struct {
@@ -40,7 +41,7 @@ type PnpParser struct {
 }
 
 // NewPolycubePolicyParser starts a new parser
-func NewPolycubePolicyParser(clientset kubernetes.Interface, podController pcn_controllers.PodController) PolycubeNetworkPolicyParser {
+func NewPolycubePolicyParser(clientset kubernetes.Interface, controller.PodController, controller.ServiceController) PolycubeNetworkPolicyParser {
 	return &PnpParser{
 		podController: podController,
 		log:           log.New(),
