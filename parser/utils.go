@@ -143,32 +143,27 @@ func implodeLabels(labels map[string]string) string {
 }
 
 // getNamespaceNames gets the namespaces names based on the provided query
-//	TODO: remove this on final version
-func getNamespaceNames(clientset kubernetes.Interface, labels map[string]string) ([]string, error) {
-
-	//-------------------------------------
-	//	Find by labels
-	//-------------------------------------
-
-	byLabels := func(labels map[string]string) ([]string, error) {
-
-		lister, err := clientset.CoreV1().Namespaces().List(meta_v1.ListOptions{
+func getNamespaceNames(clientset kubernetes.Interface, any *bool, labels map[string]string) ([]string, error) {
+	// init list options
+	listOptions := meta_v1.ListOptions{}
+	if any != nil && *any == true {
+		listOptions = meta_v1.ListOptions{
 			LabelSelector: implodeLabels(labels),
-		})
-
-		if err != nil {
-			return nil, err
 		}
-
-		names := make([]string, len(lister.Items))
-
-		for i := 0; i < len(lister.Items); i++ {
-			names[i] = lister.Items[i].Name
-		}
-		return names, nil
 	}
 
-	return byLabels(labels)
+	//	Get the list of namespaces names
+	lister, err := clientset.CoreV1().Namespaces().List(listOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	names := make([]string, len(lister.Items))
+	for i := 0; i < len(lister.Items); i++ {
+		names[i] = lister.Items[i].Name
+	}
+
+	return names, nil
 }
 
 // getTemplateLabels gets the labels of the template inside a deployment

@@ -24,7 +24,7 @@ type PolycubeNetworkPolicyTarget struct {
 	// If name and labels are irrelevant
 	Any *bool `json:"any,omitempty"`
 	// +optional
-	// WithName specifies the name of the object. Valid only for Deployment
+	// WithName specifies the name of the object. Valid only for Service
 	WithName string `json:"withName,omitempty"`
 	// +optional
 	// WithLabels specifies the labels of the target. Valid only for Pod
@@ -35,11 +35,9 @@ type PolycubeNetworkPolicyTarget struct {
 type PolycubeNetworkPolicyTargetObject string
 
 const (
-	// DeploymentTarget represents a Deployment
-	DeploymentTarget PolycubeNetworkPolicyTargetObject = "deployment"
 	// PodTarget represents a Pod
 	PodTarget PolycubeNetworkPolicyTargetObject = "pod"
-	// ServiceTarget represents a Deployment
+	// ServiceTarget represents a Service
 	ServiceTarget PolycubeNetworkPolicyTargetObject = "service"
 )
 
@@ -126,8 +124,8 @@ type PolycubeNetworkPolicyPeer struct {
 	// Any tells if name and labels don't matter
 	Any *bool `json:"any,omitempty"`
 	// +optional
-	// WithName specifies the name of the object. Only for Deployment
-	WithName string `json:"withName,omitempty"`
+	// WithName specifies the name of the object. Only for Service
+	//WithName string `json:"withName,omitempty"`
 	// +optional
 	// WithLabels specifies the labels of the object. Only for Pod
 	WithLabels map[string]string `json:"withLabels,omitempty"`
@@ -135,7 +133,7 @@ type PolycubeNetworkPolicyPeer struct {
 	// WithIP specifies the ip. Only for World
 	WithIP PolycubeNetworkPolicyWithIP `json:"withIP,omitempty"`
 	// +optional
-	// OnNamespace specifies the namespaces of the peer. Only for Deployment, Pod
+	// OnNamespace specifies the namespaces of the peer. Only for Pod
 	OnNamespace *PolycubeNetworkPolicyNamespaceSelector `json:"onNamespace,omitempty"`
 }
 
@@ -149,8 +147,8 @@ type PolycubeNetworkPolicyWithIP struct {
 type PolycubeNetworkPolicyPeerObject string
 
 const (
-	// DeploymentPeer is the Deployment
-	DeploymentPeer PolycubeNetworkPolicyPeerObject = "deployment"
+	// ServicePeer is the Service
+	ServicePeer PolycubeNetworkPolicyPeerObject = "service"
 	// PodPeer is the Pod
 	PodPeer PolycubeNetworkPolicyPeerObject = "pod"
 	// WorldPeer is the World

@@ -15,7 +15,7 @@ import (
 	k8sfirewall "github.com/SunSince90/polycube/src/components/k8s/utils/k8sfirewall"
 
 	log "github.com/sirupsen/logrus"
-	//core_v1 "k8s.io/api/core/v1"
+	core_v1 "k8s.io/api/core/v1"
 )
 
 // PolycubeNetworkPolicyParser is the polycube network policy parser
@@ -253,46 +253,10 @@ func (p *PnpParser) ParsePeer(peer v1beta.PolycubeNetworkPolicyPeer, namespace, 
 		return p.ParsePod(peer, namespace, direction, action)
 	}
 
-	//	Deployment
-	if peer.Peer == v1beta.DeploymentPeer {
-		nsList := []string{}
-
-		// put the list of namespaces
-		if peer.OnNamespace != nil {
-			namespaces, err := getNamespaceNames(p.clientset, peer.OnNamespace.WithLabels)
-			if err != nil {
-				log.Errorln("Error while trying to get the namespaces list. Going to stop with this rule.")
-				return pcn_types.ParsedRules{}, nil
-			}
-
-			nsList = append(nsList, namespaces...)
-		} else {
-			nsList = append(nsList, namespace)
-		}
-
-		//	Now do this for each namespace found
-		parsed := pcn_types.ParsedRules{}
-
-		for _, ns := range nsList {
-			templateLabels := getTemplateLabels(p.clientset, peer.WithName, namespace)
-			//	No need to add onNamespace in the fakePeer, as we already got them earlier
-			fakePeer := v1beta.PolycubeNetworkPolicyPeer{
-				Peer:       v1beta.PodPeer,
-				WithLabels: templateLabels,
-			}
-			result, err := p.ParsePod(fakePeer, ns, direction, action)
-			if err != nil {
-				log.Errorln("Could not parse pod template correctly:", fakePeer)
-
-				//	Just don't parse it
-				//return pcn_types.ParsedRules{}, err
-			} else {
-				parsed.Ingress = append(parsed.Ingress, result.Ingress...)
-				parsed.Egress = append(parsed.Egress, result.Egress...)
-			}
-		}
-		return parsed, nil
-	}
+	//	Servuce
+	/*if peer.Peer == v1beta.ServicePeer {
+		return p.ParseService(peer, namespace, direction, action)
+	}*/
 
 	//	The World?
 	if peer.Peer == v1beta.WorldPeer {
@@ -332,24 +296,37 @@ func (p *PnpParser) ParsePod(peer v1beta.PolycubeNetworkPolicyPeer, namespace, d
 		Ingress: []k8sfirewall.ChainRule{},
 		Egress:  []k8sfirewall.ChainRule{},
 	}
+	podsFound := []core_v1.Pod{}
 
-	nsLabels := map[string]string{}
-
-	// has namespace?
-	if peer.OnNamespace != nil {
-		if len(peer.OnNamespace.WithName) > 0 {
-			namespace = peer.OnNamespace.WithName
-		} else {
-			nsLabels = peer.OnNamespace.WithLabels
+	//	Default the OnNamespace to use the one of the policy
+	if peer.OnNamespace == nil {
+		peer.OnNamespace = &v1beta.PolycubeNetworkPolicyNamespaceSelector{
+			WithNames: []string{namespace},
 		}
 	}
 
-	queryP, queryN := p.buildPodQueries(peer.WithLabels, nsLabels, peer.Any, peer.OnNamespace.Any, namespace)
+	//	Check the namespace
+	if len(peer.OnNamespace.WithNames) > 0 {
+		for _, ns := range peer.OnNamespace.WithNames {
+			queryP, queryN := p.buildPodQueries(peer.WithLabels, nil, peer.Any, nil, ns)
 
-	//	Now get the pods
-	podsFound, err := p.podController.GetPods(queryP, queryN)
-	if err != nil {
-		return parsed, fmt.Errorf("Error while trying to get pods %s", err.Error())
+			//	Now get the pods
+			found, err := p.podController.GetPods(queryP, queryN)
+			if err != nil {
+				return parsed, fmt.Errorf("Error while trying to get pods with labels %+v on namespace %s, error: %s", peer.WithLabels, ns, err.Error())
+			}
+			podsFound = append(podsFound, found...)
+		}
+	} else {
+		// This also covers the case of nsAny = true
+		queryP, queryN := p.buildPodQueries(peer.WithLabels, peer.OnNamespace.WithLabels, peer.Any, peer.OnNamespace.Any, namespace)
+
+		//	Now get the pods
+		found, err := p.podController.GetPods(queryP, queryN)
+		if err != nil {
+			return parsed, fmt.Errorf("Error while trying to get pods with labels %+v on namespace with labels %v, error: %s", peer.WithLabels, peer.OnNamespace.WithLabels, err.Error())
+		}
+		podsFound = append(podsFound, found...)
 	}
 
 	//	Now build the pods
@@ -368,6 +345,12 @@ func (p *PnpParser) ParsePod(peer v1beta.PolycubeNetworkPolicyPeer, namespace, d
 
 	return parsed, nil
 }
+
+// ParseService parses service type peer
+/*func (p *PnpParser) ParseService(peer v1beta.PolycubeNetworkPolicyPeer, namespace, direction string, action v1beta.PolycubeNetworkPolicyRuleAction) (pcn_types.ParsedRules, error) {
+	nsList := []string{}
+	parsed := pcn_types.ParsedRules{}
+}*/
 
 // ParseEgress parses the Egress section of a policy
 /*func (p *PnpParser) ParseEgress(rules []networking_v1.NetworkPolicyEgressRule, namespace string) pcn_types.ParsedRules {
