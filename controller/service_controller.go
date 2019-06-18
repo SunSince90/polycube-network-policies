@@ -353,7 +353,6 @@ func (s *PcnServiceController) Subscribe(event pcn_types.EventType, spec pcn_typ
 
 // serviceMeetsCriteria is called when before dispatching the event to verify if the service should be dispatched or not
 func (s *PcnServiceController) serviceMeetsCriteria(service *core_v1.Service, spec pcn_types.ObjectQuery, nsSpec pcn_types.ObjectQuery) bool {
-
 	//	This is actually useless but who knows....
 	if service == nil {
 		return false
@@ -391,14 +390,22 @@ func (s *PcnServiceController) serviceMeetsCriteria(service *core_v1.Service, sp
 		}
 	}
 
+	log.Println("after namespace")
+
 	//-------------------------------------
 	//	The Service
 	//-------------------------------------
 
 	// The name
-	if len(spec.Name) > 0 && service.Name != spec.Name {
-		return false
+	if len(spec.Name) > 0 {
+		if spec.Name != "*" && service.Name != spec.Name {
+			return false
+		}
+
+		return true
 	}
+
+	log.Println("after namespace")
 
 	// The selectors
 	if len(spec.Labels) > 0 {
@@ -422,6 +429,7 @@ func (s *PcnServiceController) serviceMeetsCriteria(service *core_v1.Service, sp
 			return false
 		}
 	}
+	log.Println("after labels")
 
 	return true
 }

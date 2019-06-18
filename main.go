@@ -44,6 +44,8 @@ func main() {
 
 	kclientset, pclientset := getKubernetesClient()
 	c := controller.NewPcnPolicyController(kclientset, pclientset)
+	p := controller.NewPodController(kclientset)
+	s := controller.NewServiceController(kclientset)
 	c.AddUpdateFunc("new", func(item interface{}) {
 		policy, ok := item.(*v1beta.PolycubeNetworkPolicy)
 		if !ok {
@@ -59,10 +61,16 @@ func main() {
 	// run the controller loop to process items
 	go c.Run(stopCh)
 
+	go p.Run()
+	go s.Run()
+
 	// use a channel to handle OS signals to terminate and gracefully shut
 	// down processing
 	sigTerm := make(chan os.Signal, 1)
 	signal.Notify(sigTerm, syscall.SIGTERM)
 	signal.Notify(sigTerm, syscall.SIGINT)
 	<-sigTerm
+
+	p.Stop()
+	s.Stop()
 }
