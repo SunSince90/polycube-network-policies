@@ -4,10 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/SunSince90/polycube-network-policies/parser"
-
-	"github.com/SunSince90/polycube-network-policies/pkg/apis/polycubenetwork.com/v1beta"
-
 	log "github.com/Sirupsen/logrus"
 	pnp_clientset "github.com/SunSince90/polycube-network-policies/pkg/client/clientset/versioned"
 	pnp_informer "github.com/SunSince90/polycube-network-policies/pkg/client/informers/externalversions/polycubenetwork.com/v1beta"
@@ -208,7 +204,7 @@ func (c *PcnPolicyController) processNextItem() bool {
 	return true
 }
 
-func (c *PcnPolicyController) treatObject(temp interface{}) {
+/*func (c *PcnPolicyController) treatObject(temp interface{}) {
 	policy, ok := temp.(*v1beta.PolycubeNetworkPolicy)
 	if !ok {
 		log.Errorln("Error in casting policy!")
@@ -217,4 +213,4 @@ func (c *PcnPolicyController) treatObject(temp interface{}) {
 	log.Printf("%+v\n", policy)
 
 	p := parser.NewPolycubePolicyParser(c.kclientset, nil)
-}
+}*/

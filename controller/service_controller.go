@@ -20,7 +20,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	typed_core_v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
-	workqueue "k8s.io/client-go/util/workqueue"
+	workqueue "k8s.io/client-go/util/workqueue" 
 )
 
 // ServiceController is the interface of the service controller
@@ -40,9 +40,9 @@ type PcnServiceController struct {
 	dispatchers  EventDispatchersContainer
 	stopCh       chan struct{}
 	maxRetries   int
-	logBy        string
+	logBy        string 
 	lock         sync.Mutex
-	nsInterface  typed_core_v1.NamespaceInterface
+	nsInterface  typed_core_v1.NamespaceInterface 
 }
 
 // NewServiceController will start a new Service controller
