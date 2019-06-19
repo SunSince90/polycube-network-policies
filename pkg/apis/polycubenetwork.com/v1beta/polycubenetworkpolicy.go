@@ -12,9 +12,13 @@ type PolycubeNetworkPolicy struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// ApplyTo defines who this policy is intended for
 	ApplyTo PolycubeNetworkPolicyTarget `json:"applyTo,omitempty"`
+	// Priority explicitly defines the priority of the policy
+	Priority PolycubeNetworkPolicyPriority `json:"priority,omitempty"`
 	// Spec of this policy
 	Spec PolycubeNetworkPolicySpec `json:"spec,omitempty"`
 }
+
+type PolycubeNetworkPolicyPriority int
 
 // PolycubeNetworkPolicyTarget is the target of this policy
 type PolycubeNetworkPolicyTarget struct {
