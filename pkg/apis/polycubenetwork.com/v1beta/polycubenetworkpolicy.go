@@ -129,7 +129,7 @@ type PolycubeNetworkPolicyPeer struct {
 	Any *bool `json:"any,omitempty"`
 	// +optional
 	// WithName specifies the name of the object. Only for Service
-	//WithName string `json:"withName,omitempty"`
+	WithName string `json:"withName,omitempty"`
 	// +optional
 	// WithLabels specifies the labels of the object. Only for Pod
 	WithLabels map[string]string `json:"withLabels,omitempty"`

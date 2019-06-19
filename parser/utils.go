@@ -232,6 +232,64 @@ func getNamespaceNames(clientset kubernetes.Interface, any *bool, labels map[str
 	return names, nil
 }
 
+// buildNamespaceQuery builds a namespace query
+func buildNamespaceQuery(name string, labels map[string]string, any bool) pcn_types.ObjectQuery {
+	if !any {
+
+		//	Name provided?
+		if len(name) > 0 {
+			return pcn_types.ObjectQuery{
+				By:   "name",
+				Name: name,
+			}
+		}
+
+		//	Labels
+		return pcn_types.ObjectQuery{
+			By:     "labels",
+			Labels: labels,
+		}
+	}
+
+	//	Any namespace
+	return pcn_types.ObjectQuery{
+		By:   "name",
+		Name: "*",
+	}
+
+}
+
+// buildPodQuery builds a query for pods
+func buildPodQuery(labels map[string]string, any bool) pcn_types.ObjectQuery {
+
+	if !any {
+		return pcn_types.ObjectQuery{
+			By:     "labels",
+			Labels: labels,
+		}
+	}
+
+	return pcn_types.ObjectQuery{
+		By:   "name",
+		Name: "*",
+	}
+}
+
+// buildServiceQuery builds a query to get services from the service controller
+func buildServiceQuery(name string, any bool) pcn_types.ObjectQuery {
+	if !any {
+		return pcn_types.ObjectQuery{
+			By:   "name",
+			Name: name,
+		}
+	}
+
+	return pcn_types.ObjectQuery{
+		By:   "name",
+		Name: "*",
+	}
+}
+
 // getTemplateLabels gets the labels of the template inside a deployment
 func getTemplateLabels(cs kubernetes.Interface, depName, ns string) map[string]string {
 

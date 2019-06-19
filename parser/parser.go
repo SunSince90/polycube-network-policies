@@ -281,10 +281,10 @@ func (p *PnpParser) ParsePeer(peer v1beta.PolycubeNetworkPolicyPeer, protocols [
 		return p.ParsePod(peer, protocols, namespace, direction, action)
 	}
 
-	//	Servuce
-	/*if peer.Peer == v1beta.ServicePeer {
+	//	Service, but only for egress
+	if peer.Peer == v1beta.ServicePeer && direction == "egress" {
 		return p.ParseService(peer, namespace, direction, action)
-	}*/
+	}
 
 	//	The World?
 	if peer.Peer == v1beta.WorldPeer {
@@ -320,11 +320,16 @@ func (p *PnpParser) ParseWorld(ips v1beta.PolycubeNetworkPolicyWithIP, protocols
 
 // ParsePod parses pod type peer
 func (p *PnpParser) ParsePod(peer v1beta.PolycubeNetworkPolicyPeer, protocols []v1beta.PolycubeNetworkPolicyProtocolContainer, namespace, direction string, action v1beta.PolycubeNetworkPolicyRuleAction) (pcn_types.ParsedRules, error) {
+	//-------------------------------------
+	//	Init
+	//-------------------------------------
+
 	parsed := pcn_types.ParsedRules{
 		Ingress: []k8sfirewall.ChainRule{},
 		Egress:  []k8sfirewall.ChainRule{},
 	}
 	podsFound := []core_v1.Pod{}
+	anyPod := (peer.Any != nil && *peer.Any == true)
 
 	//	Default the OnNamespace to use the one of the policy
 	if peer.OnNamespace == nil {
@@ -333,10 +338,16 @@ func (p *PnpParser) ParsePod(peer v1beta.PolycubeNetworkPolicyPeer, protocols []
 		}
 	}
 
-	//	Check the namespace
+	anyNs := (peer.OnNamespace.Any != nil && *peer.OnNamespace.Any == true)
+	queryP := buildPodQuery(peer.WithLabels, anyPod)
+
+	//-------------------------------------
+	//	Get the pods
+	//-------------------------------------
+
 	if len(peer.OnNamespace.WithNames) > 0 {
 		for _, ns := range peer.OnNamespace.WithNames {
-			queryP, queryN := p.buildPodQueries(peer.WithLabels, nil, peer.Any, nil, ns)
+			queryN := buildNamespaceQuery(ns, nil, false)
 
 			//	Now get the pods
 			found, err := p.podController.GetPods(queryP, queryN)
@@ -346,8 +357,8 @@ func (p *PnpParser) ParsePod(peer v1beta.PolycubeNetworkPolicyPeer, protocols []
 			podsFound = append(podsFound, found...)
 		}
 	} else {
-		// This also covers the case of nsAny = true
-		queryP, queryN := p.buildPodQueries(peer.WithLabels, peer.OnNamespace.WithLabels, peer.Any, peer.OnNamespace.Any, namespace)
+		// This also covers the case of anyNs = true
+		queryN := buildNamespaceQuery("", peer.OnNamespace.WithLabels, anyNs)
 
 		//	Now get the pods
 		found, err := p.podController.GetPods(queryP, queryN)
@@ -357,7 +368,10 @@ func (p *PnpParser) ParsePod(peer v1beta.PolycubeNetworkPolicyPeer, protocols []
 		podsFound = append(podsFound, found...)
 	}
 
-	//	Now build the pods
+	//-------------------------------------
+	//	Generate the rules for each found pod
+	//-------------------------------------
+
 	for _, pod := range podsFound {
 		rules := pcn_types.ParsedRules{}
 
@@ -375,10 +389,56 @@ func (p *PnpParser) ParsePod(peer v1beta.PolycubeNetworkPolicyPeer, protocols []
 }
 
 // ParseService parses service type peer
-/*func (p *PnpParser) ParseService(peer v1beta.PolycubeNetworkPolicyPeer, namespace, direction string, action v1beta.PolycubeNetworkPolicyRuleAction) (pcn_types.ParsedRules, error) {
-	nsList := []string{}
+func (p *PnpParser) ParseService(peer v1beta.PolycubeNetworkPolicyPeer, namespace, direction string, action v1beta.PolycubeNetworkPolicyRuleAction) (pcn_types.ParsedRules, error) {
+	//-------------------------------------
+	//	Init
+	//-------------------------------------
+
 	parsed := pcn_types.ParsedRules{}
-}*/
+	podsFound := []core_v1.Pod{}
+	servicesFound := []core_v1.Service{}
+	anyS := (peer.Any != nil && *peer.Any == true)
+
+	//	Default the OnNamespace to use the one of the policy
+	if peer.OnNamespace == nil {
+		peer.OnNamespace = &v1beta.PolycubeNetworkPolicyNamespaceSelector{
+			WithNames: []string{namespace},
+		}
+	}
+
+	anyNs := (peer.OnNamespace.Any != nil && *peer.OnNamespace.Any == true)
+	queryS := buildServiceQuery(peer.WithName, anyS)
+
+	//-------------------------------------
+	//	Get the services
+	//-------------------------------------
+
+	//	Check the namespace
+	if len(peer.OnNamespace.WithNames) > 0 {
+		for _, ns := range peer.OnNamespace.WithNames {
+			queryN := buildNamespaceQuery(ns, nil, false)
+
+			//	Now get the service
+			/*found, err := p.serviceController.GetServices(queryS, queryN)
+			if err != nil {
+				return parsed, fmt.Errorf("Error while trying to get pods with labels %+v on namespace %s, error: %s", peer.WithLabels, ns, err.Error())
+			}
+			servicesFound = append(servicesFound, found...)*/
+		}
+	} else {
+		// This also covers the case of nsAny = true
+		queryN := buildNamespaceQuery("", peer.OnNamespace.WithLabels, anyNs)
+
+		//	Now get the services
+		/*found, err := p.serviceController.GetServices(queryS, queryN)
+		if err != nil {
+			return parsed, fmt.Errorf("Error while trying to get pods with labels %+v on namespace with labels %v, error: %s", peer.WithLabels, peer.OnNamespace.WithLabels, err.Error())
+		}
+		serviceFound = append(serviceFound, found...)*/
+	}
+
+	return parsed, nil
+}
 
 // ParseEgress parses the Egress section of a policy
 /*func (p *PnpParser) ParseEgress(rules []networking_v1.NetworkPolicyEgressRule, namespace string) pcn_types.ParsedRules {
@@ -689,47 +749,6 @@ func (p *PnpParser) ParsePod(peer v1beta.PolycubeNetworkPolicyPeer, protocols []
 
 	return rules, nil
 }*/
-
-// buildPodQueries builds the queries to be directed to the pod controller, in order to get the desired pods.
-func (p *PnpParser) buildPodQueries(podSelector, namespaceSelector map[string]string, anyPod *bool, anyNs *bool, namespace string) (pcn_types.ObjectQuery, pcn_types.ObjectQuery) {
-
-	//	Init
-	queryPod := pcn_types.ObjectQuery{}
-	queryNs := pcn_types.ObjectQuery{}
-
-	if anyPod != nil && *anyPod == true {
-		queryPod = pcn_types.ObjectQuery{
-			By:   "name",
-			Name: "*",
-		}
-	} else {
-		queryPod = pcn_types.ObjectQuery{
-			By:     "labels",
-			Labels: podSelector,
-		}
-	}
-
-	if anyNs != nil && *anyNs == true {
-		queryNs = pcn_types.ObjectQuery{
-			By:   "name",
-			Name: "*",
-		}
-	} else {
-		if len(namespace) > 0 {
-			queryNs = pcn_types.ObjectQuery{
-				By:   "name",
-				Name: namespace,
-			}
-		} else {
-			queryNs = pcn_types.ObjectQuery{
-				By:     "labels",
-				Labels: namespaceSelector,
-			}
-		}
-	}
-
-	return queryPod, queryNs
-}
 
 // DoesPolicyAffectPod checks if the provided policy affects the provided pod, returning TRUE if it does
 /*func (p *PnpParser) DoesPolicyAffectPod(policy *networking_v1.NetworkPolicy, pod *core_v1.Pod) bool {
