@@ -1,9 +1,13 @@
 package parser
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
+	log "github.com/Sirupsen/logrus"
+
+	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/client-go/kubernetes"
@@ -288,6 +292,38 @@ func buildServiceQuery(name string, any bool) pcn_types.ObjectQuery {
 		By:   "name",
 		Name: "*",
 	}
+}
+
+func formatProtocolsFromService(service core_v1.Service) ([]v1beta.PolycubeNetworkPolicyProtocolContainer, error) {
+
+	//	Only SCTP?
+	if len(service.Spec.Ports) == 1 && service.Spec.Ports[0].Protocol == core_v1.ProtocolSCTP {
+		return []v1beta.PolycubeNetworkPolicyProtocolContainer{}, fmt.Errorf("service %s only has SCTP, going to stop now", service.Name)
+	}
+
+	serviceProtocols := []v1beta.PolycubeNetworkPolicyProtocolContainer{}
+
+	//	Map kubernetes protocols to polycube's
+	protoMap := map[core_v1.Protocol]v1beta.PolycubeNetworkPolicyProtocol{
+		core_v1.ProtocolTCP: v1beta.TCP,
+		core_v1.ProtocolUDP: v1beta.UDP,
+	}
+
+	//	Get the protocols and ports
+	for _, port := range service.Spec.Ports {
+		if port.Protocol != core_v1.ProtocolSCTP {
+			serviceProtocols = append(serviceProtocols, v1beta.PolycubeNetworkPolicyProtocolContainer{
+				Ports: v1beta.PolycubeNetworkPolicyPorts{
+					Destination: port.Port,
+				},
+				Protocol: protoMap[port.Protocol],
+			})
+		} else {
+			log.Warningf("Service %s contains an unsupported protocol: %s", service.Name, string(port.Protocol))
+		}
+	}
+
+	return serviceProtocols, nil
 }
 
 // getTemplateLabels gets the labels of the template inside a deployment
