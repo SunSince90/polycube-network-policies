@@ -63,18 +63,31 @@ func main() {
 			log.Errorln("Error in casting policy!")
 		}
 
-		parsed := parser.ParseRules(policy.Spec.IngressRules, policy.Spec.EngressRules, policy.Namespace)
+		ingressRules, egressRules := parser.ParseRules(policy.Spec.IngressRules, policy.Spec.EngressRules, policy.Namespace)
 
-		log.Println("--- Egress ---")
-		for _, rule := range parsed.Egress {
-			log.Printf("- %+v\n", rule)
+		log.Println("--- Parsed Ingress ---")
+		for _, policyRule := range ingressRules {
+			log.Println("- egress rules")
+			for _, rule := range policyRule.Egress {
+				log.Printf("-- %+v\n", rule)
+			}
+			log.Println("- ingress rules")
+			for _, rule := range policyRule.Ingress {
+				log.Printf("-- %+v\n", rule)
+			}
 		}
-		log.Println()
-		log.Println("--- Ingress ---")
-		for _, rule := range parsed.Ingress {
-			log.Printf("- %+v\n", rule)
+		log.Println("--- Parsed Egress ---")
+		for _, policyRule := range egressRules {
+			log.Println("- egress rules")
+			for _, rule := range policyRule.Egress {
+				log.Printf("-- %+v\n", rule)
+			}
+			log.Println("- ingress rules")
+			for _, rule := range policyRule.Ingress {
+				log.Printf("-- %+v\n", rule)
+			}
 		}
-		log.Println()
+
 	})
 
 	// use a channel to handle OS signals to terminate and gracefully shut

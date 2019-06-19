@@ -21,10 +21,10 @@ import (
 
 // PolycubeNetworkPolicyParser is the polycube network policy parser
 type PolycubeNetworkPolicyParser interface {
-	ParseRules(v1beta.PolycubeNetworkPolicyIngressRuleContainer, v1beta.PolycubeNetworkPolicyEgressRuleContainer, string) pcn_types.ParsedRules
-	ParseIngress(v1beta.PolycubeNetworkPolicyIngressRuleContainer, string) pcn_types.ParsedRules
-	/*ParseEgress([]v1beta.PolycubeNetworkPolicyEgressRule, string) pcn_types.ParsedRules
-	ParseIPBlock(*networking_v1.IPBlock, string) pcn_types.ParsedRules
+	ParseRules(v1beta.PolycubeNetworkPolicyIngressRuleContainer, v1beta.PolycubeNetworkPolicyEgressRuleContainer, string) ([]pcn_types.ParsedRules, []pcn_types.ParsedRules)
+	ParseIngress(v1beta.PolycubeNetworkPolicyIngressRuleContainer, string) []pcn_types.ParsedRules
+	ParseEgress(v1beta.PolycubeNetworkPolicyEgressRuleContainer, string) []pcn_types.ParsedRules
+	/*ParseIPBlock(*networking_v1.IPBlock, string) pcn_types.ParsedRules
 	ParsePorts([]networking_v1.NetworkPolicyPort) []pcn_types.ProtoPort
 	ParseSelectors(*meta_v1.LabelSelector, *meta_v1.LabelSelector, string, string) (pcn_types.ParsedRules, error)
 	BuildActions([]networking_v1.NetworkPolicyIngressRule, []networking_v1.NetworkPolicyEgressRule, string) []pcn_types.FirewallAction
@@ -50,14 +50,15 @@ func NewPolycubePolicyParser(podController controller.PodController, serviceCont
 }
 
 // ParseRules is a convenient method for parsing Ingress and Egress concurrently
-func (p *PnpParser) ParseRules(ingress v1beta.PolycubeNetworkPolicyIngressRuleContainer, egress v1beta.PolycubeNetworkPolicyEgressRuleContainer, currentNamespace string) pcn_types.ParsedRules {
-	parsed := pcn_types.ParsedRules{
-		Ingress: []k8sfirewall.ChainRule{},
-		Egress:  []k8sfirewall.ChainRule{},
-	}
+func (p *PnpParser) ParseRules(ingress v1beta.PolycubeNetworkPolicyIngressRuleContainer, egress v1beta.PolycubeNetworkPolicyEgressRuleContainer, currentNamespace string) ([]pcn_types.ParsedRules, []pcn_types.ParsedRules) {
+	//-------------------------------------
+	//	Init
+	//-------------------------------------
+
+	resultIngress := []pcn_types.ParsedRules{}
+	resultEgress := []pcn_types.ParsedRules{}
 
 	var parseWait sync.WaitGroup
-	var lock sync.Mutex
 
 	parseWait.Add(2)
 
@@ -67,12 +68,7 @@ func (p *PnpParser) ParseRules(ingress v1beta.PolycubeNetworkPolicyIngressRuleCo
 
 	go func() {
 		defer parseWait.Done()
-		result := p.ParseIngress(ingress, currentNamespace)
-
-		lock.Lock()
-		parsed.Ingress = append(parsed.Ingress, result.Ingress...)
-		parsed.Egress = append(parsed.Egress, result.Egress...)
-		lock.Unlock()
+		resultIngress = p.ParseIngress(ingress, currentNamespace)
 	}()
 
 	//-------------------------------------
@@ -81,32 +77,25 @@ func (p *PnpParser) ParseRules(ingress v1beta.PolycubeNetworkPolicyIngressRuleCo
 
 	go func() {
 		defer parseWait.Done()
-		result := p.ParseEgress(egress, currentNamespace)
-
-		lock.Lock()
-		parsed.Ingress = append(parsed.Ingress, result.Ingress...)
-		parsed.Egress = append(parsed.Egress, result.Egress...)
-		lock.Unlock()
+		resultEgress = p.ParseEgress(egress, currentNamespace)
 	}()
 
 	//	Wait for them to finish before doing the rest
 	parseWait.Wait()
 
-	return parsed
+	//return parsed
+	return resultIngress, resultEgress
 }
 
 // ParseIngress parses the Ingress section of a policy
-func (p *PnpParser) ParseIngress(ingress v1beta.PolycubeNetworkPolicyIngressRuleContainer, namespace string) pcn_types.ParsedRules {
+func (p *PnpParser) ParseIngress(ingress v1beta.PolycubeNetworkPolicyIngressRuleContainer, namespace string) []pcn_types.ParsedRules {
 
 	//-------------------------------------
 	//	Init
 	//-------------------------------------
 	l := log.NewEntry(p.log)
 	l.WithFields(log.Fields{"by": "pnp-parser", "method": "ParseIngress"})
-	parsed := pcn_types.ParsedRules{
-		Ingress: []k8sfirewall.ChainRule{},
-		Egress:  []k8sfirewall.ChainRule{},
-	}
+	parsed := []pcn_types.ParsedRules{}
 	direction := "ingress"
 
 	//-------------------------------------
@@ -117,8 +106,23 @@ func (p *PnpParser) ParseIngress(ingress v1beta.PolycubeNetworkPolicyIngressRule
 
 	//	Allow all?
 	if ingress.AllowAll != nil && *ingress.AllowAll == true {
-		parsed.Egress = append(parsed.Egress, k8sfirewall.ChainRule{
-			Action: pcn_types.ActionForward,
+		parsed = append(parsed, pcn_types.ParsedRules{
+			Egress: []k8sfirewall.ChainRule{
+				k8sfirewall.ChainRule{
+					Action:    pcn_types.ActionForward,
+					Conntrack: pcn_types.ConnTrackNew,
+				},
+				k8sfirewall.ChainRule{
+					Action:    pcn_types.ActionForward,
+					Conntrack: pcn_types.ConnTrackEstablished,
+				},
+			},
+			Ingress: []k8sfirewall.ChainRule{
+				k8sfirewall.ChainRule{
+					Action:    pcn_types.ActionForward,
+					Conntrack: pcn_types.ConnTrackEstablished,
+				},
+			},
 		})
 
 		return parsed
@@ -126,9 +130,14 @@ func (p *PnpParser) ParseIngress(ingress v1beta.PolycubeNetworkPolicyIngressRule
 
 	//	Drop all?
 	if ingress.DropAll != nil && *ingress.DropAll == true {
-		/*parsed.Egress = append(parsed.Egress, k8sfirewall.ChainRule{
-			Action: pcn_types.ActionDrop,
-		})*/
+		parsed = append(parsed, pcn_types.ParsedRules{
+			Egress: []k8sfirewall.ChainRule{
+				k8sfirewall.ChainRule{
+					Action:    pcn_types.ActionDrop,
+					Conntrack: pcn_types.ConnTrackNew,
+				},
+			},
+		})
 
 		return parsed
 	}
@@ -143,9 +152,10 @@ func (p *PnpParser) ParseIngress(ingress v1beta.PolycubeNetworkPolicyIngressRule
 	//-------------------------------------
 	for _, rule := range ingress.Rules {
 
+		parsedRule := pcn_types.ParsedRules{}
+
 		//	Parse the peer
 		generatedRules, _ := p.ParsePeer(rule.From, namespace, direction, rule.Action)
-
 		//	No need to check for err here: if err happened then generatedRules is empty, so the loops above wouldn't start.
 		//	Let's consider this a "graceful" break
 
@@ -156,7 +166,7 @@ func (p *PnpParser) ParseIngress(ingress v1beta.PolycubeNetworkPolicyIngressRule
 				tempRule.Dport = protocol.Ports.Source
 				tempRule.Sport = protocol.Ports.Destination
 				tempRule.L4proto = string(protocol.Protocol)
-				parsed.Ingress = append(parsed.Ingress, tempRule)
+				parsedRule.Ingress = append(parsedRule.Ingress, tempRule)
 			}
 		}
 
@@ -167,26 +177,25 @@ func (p *PnpParser) ParseIngress(ingress v1beta.PolycubeNetworkPolicyIngressRule
 				tempRule.Sport = protocol.Ports.Source
 				tempRule.Dport = protocol.Ports.Destination
 				tempRule.L4proto = string(protocol.Protocol)
-				parsed.Egress = append(parsed.Egress, tempRule)
+				parsedRule.Egress = append(parsedRule.Egress, tempRule)
 			}
 		}
+
+		parsed = append(parsed, parsedRule)
 	}
 
 	return parsed
 }
 
 // ParseEgress parses the Egress section of a policy
-func (p *PnpParser) ParseEgress(egress v1beta.PolycubeNetworkPolicyEgressRuleContainer, namespace string) pcn_types.ParsedRules {
+func (p *PnpParser) ParseEgress(egress v1beta.PolycubeNetworkPolicyEgressRuleContainer, namespace string) []pcn_types.ParsedRules {
 
 	//-------------------------------------
 	//	Init
 	//-------------------------------------
 	l := log.NewEntry(p.log)
 	l.WithFields(log.Fields{"by": "pnp-parser", "method": "ParseEgress"})
-	parsed := pcn_types.ParsedRules{
-		Ingress: []k8sfirewall.ChainRule{},
-		Egress:  []k8sfirewall.ChainRule{},
-	}
+	parsed := []pcn_types.ParsedRules{}
 	direction := "egress"
 
 	//-------------------------------------
@@ -197,8 +206,23 @@ func (p *PnpParser) ParseEgress(egress v1beta.PolycubeNetworkPolicyEgressRuleCon
 
 	//	Allow all?
 	if egress.AllowAll != nil && *egress.AllowAll == true {
-		parsed.Ingress = append(parsed.Ingress, k8sfirewall.ChainRule{
-			Action: pcn_types.ActionForward,
+		parsed = append(parsed, pcn_types.ParsedRules{
+			Ingress: []k8sfirewall.ChainRule{
+				k8sfirewall.ChainRule{
+					Action:    pcn_types.ActionForward,
+					Conntrack: pcn_types.ConnTrackNew,
+				},
+				k8sfirewall.ChainRule{
+					Action:    pcn_types.ActionForward,
+					Conntrack: pcn_types.ConnTrackEstablished,
+				},
+			},
+			Egress: []k8sfirewall.ChainRule{
+				k8sfirewall.ChainRule{
+					Action:    pcn_types.ActionForward,
+					Conntrack: pcn_types.ConnTrackEstablished,
+				},
+			},
 		})
 
 		return parsed
@@ -206,9 +230,14 @@ func (p *PnpParser) ParseEgress(egress v1beta.PolycubeNetworkPolicyEgressRuleCon
 
 	//	Drop all?
 	if egress.DropAll != nil && *egress.DropAll == true {
-		/*parsed.Ingress = append(parsed.Ingress, k8sfirewall.ChainRule{
-			Action: pcn_types.ActionDrop,
-		})*/
+		parsed = append(parsed, pcn_types.ParsedRules{
+			Ingress: []k8sfirewall.ChainRule{
+				k8sfirewall.ChainRule{
+					Action:    pcn_types.ActionDrop,
+					Conntrack: pcn_types.ConnTrackNew,
+				},
+			},
+		})
 
 		return parsed
 	}
@@ -222,6 +251,7 @@ func (p *PnpParser) ParseEgress(egress v1beta.PolycubeNetworkPolicyEgressRuleCon
 	//	Actual parsing
 	//-------------------------------------
 	for _, rule := range egress.Rules {
+		parsedRule := pcn_types.ParsedRules{}
 
 		//	Parse the peer
 		generatedRules, _ := p.ParsePeer(rule.To, namespace, direction, rule.Action)
@@ -235,7 +265,7 @@ func (p *PnpParser) ParseEgress(egress v1beta.PolycubeNetworkPolicyEgressRuleCon
 				tempRule.Dport = protocol.Ports.Destination
 				tempRule.Sport = protocol.Ports.Source
 				tempRule.L4proto = string(protocol.Protocol)
-				parsed.Ingress = append(parsed.Ingress, tempRule)
+				parsedRule.Ingress = append(parsedRule.Ingress, tempRule)
 			}
 		}
 
@@ -246,9 +276,11 @@ func (p *PnpParser) ParseEgress(egress v1beta.PolycubeNetworkPolicyEgressRuleCon
 				tempRule.Sport = protocol.Ports.Destination
 				tempRule.Dport = protocol.Ports.Source
 				tempRule.L4proto = string(protocol.Protocol)
-				parsed.Egress = append(parsed.Egress, tempRule)
+				parsedRule.Egress = append(parsedRule.Egress, tempRule)
 			}
 		}
+
+		parsed = append(parsed, parsedRule)
 	}
 
 	return parsed
