@@ -63,7 +63,7 @@ func main() {
 			log.Errorln("Error in casting policy!")
 		}
 
-		ingressRules, egressRules := parser.ParseRules(policy.Spec.IngressRules, policy.Spec.EngressRules, policy.Namespace)
+		ingressRules, egressRules := parser.ParseRules(policy.ApplyTo, policy.Spec.IngressRules, policy.Spec.EngressRules, policy.Namespace)
 
 		log.Println("--- Parsed Ingress ---")
 		for _, policyRule := range ingressRules {
