@@ -3,6 +3,9 @@ package parser
 import (
 	"testing"
 
+	core_v1 "k8s.io/api/core/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/SunSince90/polycube-network-policies/pkg/apis/polycubenetwork.com/v1beta"
 
 	"github.com/stretchr/testify/assert"
@@ -182,4 +185,104 @@ func TestBuildEgress(t *testing.T) {
 			assert.Equal(t, udpDest, rule.Dport)
 		}
 	}
+}
+
+func TestBuildNsQuery(t *testing.T) {
+	//	Any is true and takes precedence
+	namespace := "ns"
+	nsLabels := map[string]string{"name": "ns"}
+	result := buildNamespaceQuery(namespace, nsLabels, true)
+
+	assert.Equal(t, "name", result.By)
+	assert.Equal(t, "*", result.Name)
+	assert.Empty(t, result.Labels)
+
+	//	Any is not true, name takes precedence
+
+	result = buildNamespaceQuery(namespace, nsLabels, false)
+
+	assert.Equal(t, "name", result.By)
+	assert.Equal(t, namespace, result.Name)
+	assert.Empty(t, result.Labels)
+
+	result = buildNamespaceQuery("", nsLabels, false)
+
+	assert.Equal(t, "labels", result.By)
+	assert.Equal(t, nsLabels, result.Labels)
+	assert.Empty(t, result.Name)
+}
+
+func TestBuildPodQuery(t *testing.T) {
+	//	Any is true and takes precedence
+	labels := map[string]string{"name": "tt"}
+	result := buildPodQuery(labels, true)
+
+	assert.Equal(t, "name", result.By)
+	assert.Equal(t, "*", result.Name)
+	assert.Empty(t, result.Labels)
+
+	//	Any is not true
+
+	result = buildPodQuery(labels, false)
+
+	assert.Equal(t, "labels", result.By)
+	assert.Equal(t, labels, result.Labels)
+	assert.Empty(t, result.Name)
+}
+
+func TestServicePodQuery(t *testing.T) {
+	name := "serv"
+	result := buildServiceQuery(name, true)
+
+	assert.Equal(t, "name", result.By)
+	assert.Equal(t, "*", result.Name)
+	assert.Empty(t, result.Labels)
+
+	result = buildServiceQuery(name, false)
+	assert.Equal(t, "name", result.By)
+	assert.Equal(t, name, result.Name)
+	assert.Empty(t, result.Labels)
+}
+
+func TestGetProtocolsFromService(t *testing.T) {
+	serv := core_v1.Service{
+		ObjectMeta: meta_v1.ObjectMeta{
+			Name: "service",
+		},
+		Spec: core_v1.ServiceSpec{
+			Selector: map[string]string{
+				"name": "service",
+			},
+			Ports: []core_v1.ServicePort{
+				core_v1.ServicePort{
+					Protocol: core_v1.ProtocolSCTP,
+				},
+			},
+		},
+	}
+
+	result, err := formatProtocolsFromService(serv)
+	assert.NotEmpty(t, err)
+	assert.Empty(t, result)
+
+	serv.Spec.Ports = []core_v1.ServicePort{
+		core_v1.ServicePort{
+			Protocol: core_v1.ProtocolTCP,
+			Port:     8080,
+		},
+		core_v1.ServicePort{
+			Protocol: core_v1.ProtocolUDP,
+			Port:     9090,
+		},
+	}
+
+	result, err = formatProtocolsFromService(serv)
+	assert.Empty(t, err)
+	assert.NotEmpty(t, result)
+
+	assert.Equal(t, v1beta.TCP, result[0].Protocol)
+	assert.Equal(t, int32(8080), result[0].Ports.Destination)
+	assert.Equal(t, v1beta.UDP, result[1].Protocol)
+	assert.Equal(t, int32(9090), result[1].Ports.Destination)
+
 }
