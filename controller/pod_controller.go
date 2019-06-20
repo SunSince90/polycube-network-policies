@@ -488,18 +488,16 @@ func (p *PcnPodController) GetPods(queryPod pcn_types.ObjectQuery, queryNs pcn_t
 	//	Preliminary checks
 	//------------------------------------------------
 	//	The namespace
-	if strings.ToLower(queryNs.By) == "name" && queryNs.Name != "*" {
-		nsList, err := p.getNamespaces(queryNs)
-		if err != nil {
-			return []core_v1.Pod{}, err
-		}
-		if len(nsList) < 1 {
-			//	If no namespace is found, it is useless to go on searching for pods
-			return []core_v1.Pod{}, nil
-		}
-		for _, n := range nsList {
-			ns[n.Name] = true
-		}
+	nsList, err := p.getNamespaces(queryNs)
+	if err != nil {
+		return []core_v1.Pod{}, err
+	}
+	if len(nsList) < 1 {
+		//	If no namespace is found, it is useless to go on searching for pods
+		return []core_v1.Pod{}, nil
+	}
+	for _, n := range nsList {
+		ns[n.Name] = true
 	}
 
 	//	Node specified?
@@ -584,7 +582,6 @@ func (p *PcnPodController) GetPods(queryPod pcn_types.ObjectQuery, queryNs pcn_t
 
 // getNamespaces gets the namespaces based on the provided query
 func (p *PcnPodController) getNamespaces(query pcn_types.ObjectQuery) ([]core_v1.Namespace, error) {
-
 	// Use the external namespace controller, if available
 	//if p.nsController != nil {
 	//return p.nsController.GetNamespaces(query)

@@ -163,7 +163,7 @@ func (p *PnpParser) ParseIngress(target v1beta.PolycubeNetworkPolicyTarget, ingr
 		protocols := []v1beta.PolycubeNetworkPolicyProtocolContainer{}
 
 		//	You have set service as target but also specified the ports: I take it as you want to override something.
-		if len(protocols) < 1 && len(serviceProtocols) > 0 {
+		if len(rule.Protocols) < 1 && len(serviceProtocols) > 0 {
 			protocols = serviceProtocols
 		} else {
 			protocols = rule.Protocols
