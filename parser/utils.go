@@ -148,6 +148,15 @@ func buildIngressConnectionTemplates(src, action string, protocols []v1beta.Poly
 	return finalParsed
 }
 
+// buildTemplates is just a shorthand for the ingress and egress ones
+func buildTemplates(ip, action, direction string, protocols []v1beta.PolycubeNetworkPolicyProtocolContainer) pcn_types.ParsedRules {
+	if direction == "ingress" {
+		return buildIngressConnectionTemplates(ip, action, protocols)
+	}
+
+	return buildEgressConnectionTemplates(ip, action, protocols)
+}
+
 // buildActionKey returns a key to be used in the firewall actions (to know how they should react to a pod event)
 func buildActionKey(podLabels, nsLabels map[string]string, nsName string) string {
 	key := ""
@@ -324,41 +333,4 @@ func formatProtocolsFromService(service core_v1.Service) ([]v1beta.PolycubeNetwo
 	}
 
 	return serviceProtocols, nil
-}
-
-// getTemplateLabels gets the labels of the template inside a deployment
-func getTemplateLabels(cs kubernetes.Interface, depName, ns string) map[string]string {
-
-	//	With apps v1
-	appsv1 := func() (bool, map[string]string) {
-
-		dep, err := cs.AppsV1().Deployments(ns).Get(depName, meta_v1.GetOptions{})
-		if err != nil {
-			return false, nil
-		}
-
-		return true, dep.Spec.Template.Labels
-	}
-
-	//	With extension v1
-	extensionv1 := func() (bool, map[string]string) {
-
-		dep, err := cs.ExtensionsV1beta1().Deployments(ns).Get(depName, meta_v1.GetOptions{})
-		if err != nil {
-			return false, nil
-		}
-
-		return true, dep.Spec.Template.Labels
-	}
-
-	if found, labels := appsv1(); found {
-		return labels
-	}
-
-	if found, labels := extensionv1(); found {
-		return labels
-	}
-
-	//log
-	return nil
 }

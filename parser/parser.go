@@ -21,9 +21,9 @@ import (
 
 // PolycubeNetworkPolicyParser is the polycube network policy parser
 type PolycubeNetworkPolicyParser interface {
-	ParseRules(v1beta.PolycubeNetworkPolicyTarget, v1beta.PolycubeNetworkPolicyIngressRuleContainer, v1beta.PolycubeNetworkPolicyEgressRuleContainer, string) ([]pcn_types.ParsedRules, []pcn_types.ParsedRules)
-	ParseIngress(v1beta.PolycubeNetworkPolicyTarget, v1beta.PolycubeNetworkPolicyIngressRuleContainer, string) []pcn_types.ParsedRules
-	ParseEgress(v1beta.PolycubeNetworkPolicyEgressRuleContainer, string) []pcn_types.ParsedRules
+	ParseRules(v1beta.PolycubeNetworkPolicyTarget, v1beta.PolycubeNetworkPolicyIngressRuleContainer, v1beta.PolycubeNetworkPolicyEgressRuleContainer, string) ([]pcn_types.ParsedRules, []pcn_types.ParsedRules, [][]pcn_types.FirewallAction, [][]pcn_types.FirewallAction)
+	ParseIngress(v1beta.PolycubeNetworkPolicyTarget, v1beta.PolycubeNetworkPolicyIngressRuleContainer, string) ([]pcn_types.ParsedRules, [][]pcn_types.FirewallAction)
+	ParseEgress(v1beta.PolycubeNetworkPolicyEgressRuleContainer, string) ([]pcn_types.ParsedRules, [][]pcn_types.FirewallAction)
 	/*ParseIPBlock(*networking_v1.IPBlock, string) pcn_types.ParsedRules
 	ParsePorts([]networking_v1.NetworkPolicyPort) []pcn_types.ProtoPort
 	ParseSelectors(*meta_v1.LabelSelector, *meta_v1.LabelSelector, string, string) (pcn_types.ParsedRules, error)
@@ -50,13 +50,15 @@ func NewPolycubePolicyParser(podController controller.PodController, serviceCont
 }
 
 // ParseRules is a convenient method for parsing Ingress and Egress concurrently
-func (p *PnpParser) ParseRules(target v1beta.PolycubeNetworkPolicyTarget, ingress v1beta.PolycubeNetworkPolicyIngressRuleContainer, egress v1beta.PolycubeNetworkPolicyEgressRuleContainer, currentNamespace string) ([]pcn_types.ParsedRules, []pcn_types.ParsedRules) {
+func (p *PnpParser) ParseRules(target v1beta.PolycubeNetworkPolicyTarget, ingress v1beta.PolycubeNetworkPolicyIngressRuleContainer, egress v1beta.PolycubeNetworkPolicyEgressRuleContainer, currentNamespace string) ([]pcn_types.ParsedRules, []pcn_types.ParsedRules, [][]pcn_types.FirewallAction, [][]pcn_types.FirewallAction) {
 	//-------------------------------------
 	//	Init
 	//-------------------------------------
 
 	resultIngress := []pcn_types.ParsedRules{}
 	resultEgress := []pcn_types.ParsedRules{}
+	ingressActions := [][]pcn_types.FirewallAction{}
+	egressActions := [][]pcn_types.FirewallAction{}
 
 	var parseWait sync.WaitGroup
 
@@ -68,7 +70,7 @@ func (p *PnpParser) ParseRules(target v1beta.PolycubeNetworkPolicyTarget, ingres
 
 	go func() {
 		defer parseWait.Done()
-		resultIngress = p.ParseIngress(target, ingress, currentNamespace)
+		resultIngress, ingressActions = p.ParseIngress(target, ingress, currentNamespace)
 	}()
 
 	//-------------------------------------
@@ -77,18 +79,18 @@ func (p *PnpParser) ParseRules(target v1beta.PolycubeNetworkPolicyTarget, ingres
 
 	go func() {
 		defer parseWait.Done()
-		resultEgress = p.ParseEgress(egress, currentNamespace)
+		resultEgress, egressActions = p.ParseEgress(egress, currentNamespace)
 	}()
 
 	//	Wait for them to finish before doing the rest
 	parseWait.Wait()
 
 	//return parsed
-	return resultIngress, resultEgress
+	return resultIngress, resultEgress, ingressActions, egressActions
 }
 
 // ParseIngress parses the Ingress section of a policy
-func (p *PnpParser) ParseIngress(target v1beta.PolycubeNetworkPolicyTarget, ingress v1beta.PolycubeNetworkPolicyIngressRuleContainer, namespace string) []pcn_types.ParsedRules {
+func (p *PnpParser) ParseIngress(target v1beta.PolycubeNetworkPolicyTarget, ingress v1beta.PolycubeNetworkPolicyIngressRuleContainer, namespace string) ([]pcn_types.ParsedRules, [][]pcn_types.FirewallAction) {
 
 	//-------------------------------------
 	//	Init
@@ -109,7 +111,7 @@ func (p *PnpParser) ParseIngress(target v1beta.PolycubeNetworkPolicyTarget, ingr
 		_service, err := p.serviceController.GetServices(pcn_types.ObjectQuery{By: "name", Name: target.WithName}, pcn_types.ObjectQuery{By: "name", Name: namespace})
 		if err != nil {
 			l.Errorln("Error occurred while getting service", target.WithName, ". Going to stop now.")
-			return parsed
+			return parsed, [][]pcn_types.FirewallAction{}
 		}
 
 		if len(_service) < 1 {
@@ -121,13 +123,13 @@ func (p *PnpParser) ParseIngress(target v1beta.PolycubeNetworkPolicyTarget, ingr
 		//	Has no selectors?
 		if len(service.Spec.Selector) < 1 {
 			l.Errorf("Target service %s has no selectors and this is not allowed.")
-			return parsed
+			return parsed, [][]pcn_types.FirewallAction{}
 		}
 
 		serviceProtocols, err = formatProtocolsFromService(service)
 		if err != nil {
 			log.Errorln("Could not get the service:", err, ". Going to stop parsing the policy.")
-			return parsed
+			return parsed, [][]pcn_types.FirewallAction{}
 		}
 	}
 
@@ -139,25 +141,27 @@ func (p *PnpParser) ParseIngress(target v1beta.PolycubeNetworkPolicyTarget, ingr
 	if ingress.AllowAll != nil && *ingress.AllowAll == true {
 		return []pcn_types.ParsedRules{
 			buildIngressConnectionTemplates("", "forward", serviceProtocols),
-		}
+		}, [][]pcn_types.FirewallAction{}
 	}
 
 	//	Drop all?
 	if ingress.DropAll != nil && *ingress.DropAll == true {
 		return []pcn_types.ParsedRules{
 			buildIngressConnectionTemplates("", "drop", serviceProtocols),
-		}
+		}, [][]pcn_types.FirewallAction{}
 	}
 
 	//	No rules?
 	if len(ingress.Rules) < 1 {
 		l.Errorln("There are no rules in ingress!")
-		return parsed
+		return parsed, [][]pcn_types.FirewallAction{}
 	}
 
 	//-------------------------------------
 	//	Actual parsing
 	//-------------------------------------
+
+	actions := [][]pcn_types.FirewallAction{}
 	for i, rule := range ingress.Rules {
 
 		protocols := []v1beta.PolycubeNetworkPolicyProtocolContainer{}
@@ -170,42 +174,20 @@ func (p *PnpParser) ParseIngress(target v1beta.PolycubeNetworkPolicyTarget, ingr
 		}
 
 		//	Parse the peer
-		generatedRules, err := p.ParsePeer(rule.From, protocols, namespace, direction, rule.Action)
+		generatedRules, generatedActions, err := p.ParsePeer(rule.From, protocols, namespace, direction, rule.Action)
 		if err != nil {
 			l.Errorf("Error while parsing rule #%d in ingress", i)
 		} else {
 			parsed = append(parsed, generatedRules)
+			actions = append(actions, generatedActions)
 		}
-
-		// Parse the protocols for ingress
-		/*for _, generated := range generatedRules.Ingress {
-			for _, protocol := range rule.Protocols {
-				tempRule := generated
-				tempRule.Dport = protocol.Ports.Source
-				tempRule.Sport = protocol.Ports.Destination
-				tempRule.L4proto = string(protocol.Protocol)
-				parsedRule.Ingress = append(parsedRule.Ingress, tempRule)
-			}
-		}
-
-		// parse the protocol for egress
-		for _, generated := range generatedRules.Egress {
-			for _, protocol := range rule.Protocols {
-				tempRule := generated
-				tempRule.Sport = protocol.Ports.Source
-				tempRule.Dport = protocol.Ports.Destination
-				tempRule.L4proto = string(protocol.Protocol)
-				parsedRule.Egress = append(parsedRule.Egress, tempRule)
-			}
-		}*/
-
 	}
 
-	return parsed
+	return parsed, actions
 }
 
 // ParseEgress parses the Egress section of a policy
-func (p *PnpParser) ParseEgress(egress v1beta.PolycubeNetworkPolicyEgressRuleContainer, namespace string) []pcn_types.ParsedRules {
+func (p *PnpParser) ParseEgress(egress v1beta.PolycubeNetworkPolicyEgressRuleContainer, namespace string) ([]pcn_types.ParsedRules, [][]pcn_types.FirewallAction) {
 	//-------------------------------------
 	//	Init
 	//-------------------------------------
@@ -222,41 +204,44 @@ func (p *PnpParser) ParseEgress(egress v1beta.PolycubeNetworkPolicyEgressRuleCon
 	if egress.AllowAll != nil && *egress.AllowAll == true {
 		return []pcn_types.ParsedRules{
 			buildEgressConnectionTemplates("", "forward", []v1beta.PolycubeNetworkPolicyProtocolContainer{}),
-		}
+		}, [][]pcn_types.FirewallAction{}
 	}
 
 	//	Drop all?
 	if egress.DropAll != nil && *egress.DropAll == true {
 		return []pcn_types.ParsedRules{
 			buildEgressConnectionTemplates("", "drop", []v1beta.PolycubeNetworkPolicyProtocolContainer{}),
-		}
+		}, [][]pcn_types.FirewallAction{}
 	}
 
 	//	No rules?
 	if len(egress.Rules) < 1 {
 		l.Errorln("There are no rules in egress!")
-		return parsed
+		return parsed, [][]pcn_types.FirewallAction{}
 	}
 
 	//-------------------------------------
 	//	Actual parsing
 	//-------------------------------------
+
+	actions := [][]pcn_types.FirewallAction{}
 	for i, rule := range egress.Rules {
 
 		//	Parse the peer
-		generatedRules, err := p.ParsePeer(rule.To, rule.Protocols, namespace, direction, rule.Action)
+		generatedRules, generatedActions, err := p.ParsePeer(rule.To, rule.Protocols, namespace, direction, rule.Action)
 		if err != nil {
 			l.Errorf("Error while parsing rule #%d in egress", i)
 		} else {
 			parsed = append(parsed, generatedRules)
+			actions = append(actions, generatedActions)
 		}
 	}
 
-	return parsed
+	return parsed, actions
 }
 
 // ParsePeer is a convenient method to parse the peer. Works for both ingress and egress connections
-func (p *PnpParser) ParsePeer(peer v1beta.PolycubeNetworkPolicyPeer, protocols []v1beta.PolycubeNetworkPolicyProtocolContainer, namespace, direction string, action v1beta.PolycubeNetworkPolicyRuleAction) (pcn_types.ParsedRules, error) {
+func (p *PnpParser) ParsePeer(peer v1beta.PolycubeNetworkPolicyPeer, protocols []v1beta.PolycubeNetworkPolicyProtocolContainer, namespace, direction string, action v1beta.PolycubeNetworkPolicyRuleAction) (pcn_types.ParsedRules, []pcn_types.FirewallAction, error) {
 
 	//	Pod?
 	if peer.Peer == v1beta.PodPeer {
@@ -271,10 +256,10 @@ func (p *PnpParser) ParsePeer(peer v1beta.PolycubeNetworkPolicyPeer, protocols [
 
 	//	The World?
 	if peer.Peer == v1beta.WorldPeer {
-		return p.ParseWorld(peer.WithIP, protocols, direction, action), nil
+		return p.ParseWorld(peer.WithIP, protocols, direction, action), []pcn_types.FirewallAction{}, nil
 	}
 
-	return pcn_types.ParsedRules{}, nil
+	return pcn_types.ParsedRules{}, []pcn_types.FirewallAction{}, nil
 }
 
 // ParseWorld parses world type peer
@@ -302,7 +287,7 @@ func (p *PnpParser) ParseWorld(ips v1beta.PolycubeNetworkPolicyWithIP, protocols
 }
 
 // ParsePod parses pod type peer
-func (p *PnpParser) ParsePod(peer v1beta.PolycubeNetworkPolicyPeer, protocols []v1beta.PolycubeNetworkPolicyProtocolContainer, namespace, direction string, action v1beta.PolycubeNetworkPolicyRuleAction) (pcn_types.ParsedRules, error) {
+func (p *PnpParser) ParsePod(peer v1beta.PolycubeNetworkPolicyPeer, protocols []v1beta.PolycubeNetworkPolicyProtocolContainer, namespace, direction string, action v1beta.PolycubeNetworkPolicyRuleAction) (pcn_types.ParsedRules, []pcn_types.FirewallAction, error) {
 	//-------------------------------------
 	//	Init
 	//-------------------------------------
@@ -335,7 +320,7 @@ func (p *PnpParser) ParsePod(peer v1beta.PolycubeNetworkPolicyPeer, protocols []
 			//	Now get the pods
 			found, err := p.podController.GetPods(queryP, queryN)
 			if err != nil {
-				return parsed, fmt.Errorf("Error while trying to get pods with labels %+v on namespace %s, error: %s", peer.WithLabels, ns, err.Error())
+				return parsed, []pcn_types.FirewallAction{}, fmt.Errorf("Error while trying to get pods with labels %+v on namespace %s, error: %s", peer.WithLabels, ns, err.Error())
 			}
 			podsFound = append(podsFound, found...)
 		}
@@ -346,7 +331,7 @@ func (p *PnpParser) ParsePod(peer v1beta.PolycubeNetworkPolicyPeer, protocols []
 		//	Now get the pods
 		found, err := p.podController.GetPods(queryP, queryN)
 		if err != nil {
-			return parsed, fmt.Errorf("Error while trying to get pods with labels %+v on namespace with labels %v, error: %s", peer.WithLabels, peer.OnNamespace.WithLabels, err.Error())
+			return parsed, []pcn_types.FirewallAction{}, fmt.Errorf("Error while trying to get pods with labels %+v on namespace with labels %v, error: %s", peer.WithLabels, peer.OnNamespace.WithLabels, err.Error())
 		}
 		podsFound = append(podsFound, found...)
 	}
@@ -368,11 +353,40 @@ func (p *PnpParser) ParsePod(peer v1beta.PolycubeNetworkPolicyPeer, protocols []
 		parsed.Egress = append(parsed.Egress, rules.Egress...)
 	}
 
-	return parsed, nil
+	//-------------------------------------
+	//	Generate the actions
+	//-------------------------------------
+
+	actions := []pcn_types.FirewallAction{}
+	if len(peer.OnNamespace.WithNames) > 0 {
+		for _, ns := range peer.OnNamespace.WithNames {
+			firewallAction := pcn_types.FirewallAction{
+				PodLabels:       peer.WithLabels,
+				NamespaceLabels: nil,
+				NamespaceName:   ns,
+				Key:             buildActionKey(peer.WithLabels, nil, ns),
+				Templates:       buildTemplates("", string(action), direction, protocols),
+			}
+
+			actions = append(actions, firewallAction)
+		}
+	} else {
+		firewallAction := pcn_types.FirewallAction{
+			PodLabels:       peer.WithLabels,
+			NamespaceLabels: peer.OnNamespace.WithLabels,
+			NamespaceName:   "",
+			Key:             buildActionKey(peer.WithLabels, peer.OnNamespace.WithLabels, ""),
+			Templates:       buildTemplates("", string(action), direction, protocols),
+		}
+
+		actions = append(actions, firewallAction)
+	}
+
+	return parsed, actions, nil
 }
 
 // ParseService parses service type peer
-func (p *PnpParser) ParseService(peer v1beta.PolycubeNetworkPolicyPeer, namespace, direction string, action v1beta.PolycubeNetworkPolicyRuleAction) (pcn_types.ParsedRules, error) {
+func (p *PnpParser) ParseService(peer v1beta.PolycubeNetworkPolicyPeer, namespace, direction string, action v1beta.PolycubeNetworkPolicyRuleAction) (pcn_types.ParsedRules, []pcn_types.FirewallAction, error) {
 	//-------------------------------------
 	//	Init
 	//-------------------------------------
@@ -380,7 +394,11 @@ func (p *PnpParser) ParseService(peer v1beta.PolycubeNetworkPolicyPeer, namespac
 	l.WithFields(log.Fields{"by": "pnp-parser", "method": "ParseService"})
 	parsed := pcn_types.ParsedRules{}
 	servicesFound := []core_v1.Service{}
-	anyS := (peer.Any != nil && *peer.Any == true)
+
+	//	UPDATE: decided to remove the capability to use ANY when peer is service. It is way *TOO HARD* to manage events in that case.
+	//	Also, don't think someone actually needs something like that, cluster is very proNe to errors if enabled.
+	//anyS := (peer.Any != nil && *peer.Any == true)
+	anyS := false
 
 	//	Default the OnNamespace to use the one of the policy
 	if peer.OnNamespace == nil {
@@ -391,6 +409,7 @@ func (p *PnpParser) ParseService(peer v1beta.PolycubeNetworkPolicyPeer, namespac
 
 	anyNs := (peer.OnNamespace.Any != nil && *peer.OnNamespace.Any == true)
 	queryS := buildServiceQuery(peer.WithName, anyS)
+	actions := []pcn_types.FirewallAction{}
 
 	//-------------------------------------
 	//	Get the services
@@ -404,7 +423,7 @@ func (p *PnpParser) ParseService(peer v1beta.PolycubeNetworkPolicyPeer, namespac
 			//	Now get the service
 			found, err := p.serviceController.GetServices(queryS, queryN)
 			if err != nil {
-				return parsed, fmt.Errorf("Error while trying to get pods with labels %+v on namespace %s, error: %s", peer.WithLabels, ns, err.Error())
+				return parsed, []pcn_types.FirewallAction{}, fmt.Errorf("Error while trying to get pods with labels %+v on namespace %s, error: %s", peer.WithLabels, ns, err.Error())
 			}
 			servicesFound = append(servicesFound, found...)
 		}
@@ -415,7 +434,7 @@ func (p *PnpParser) ParseService(peer v1beta.PolycubeNetworkPolicyPeer, namespac
 		//	Now get the services
 		found, err := p.serviceController.GetServices(queryS, queryN)
 		if err != nil {
-			return parsed, fmt.Errorf("Error while trying to get pods with labels %+v on namespace with labels %v, error: %s", peer.WithLabels, peer.OnNamespace.WithLabels, err.Error())
+			return parsed, []pcn_types.FirewallAction{}, fmt.Errorf("Error while trying to get pods with labels %+v on namespace with labels %v, error: %s", peer.WithLabels, peer.OnNamespace.WithLabels, err.Error())
 		}
 		servicesFound = append(servicesFound, found...)
 	}
@@ -447,7 +466,8 @@ func (p *PnpParser) ParseService(peer v1beta.PolycubeNetworkPolicyPeer, namespac
 					},
 				}
 
-				generatedRules, err := p.ParsePod(fakePeer, protocols, serv.Namespace, direction, action)
+				//	Actions are not going to be based on the single pods
+				generatedRules, _, err := p.ParsePod(fakePeer, protocols, serv.Namespace, direction, action)
 				if err != nil {
 					l.Errorln("Error while generating rules for service peer", serv.Name)
 				} else {
@@ -455,9 +475,25 @@ func (p *PnpParser) ParseService(peer v1beta.PolycubeNetworkPolicyPeer, namespac
 					parsed.Ingress = append(parsed.Ingress, generatedRules.Ingress...)
 					parsed.Egress = append(parsed.Egress, generatedRules.Egress...)
 				}
+
+				//	Build the actions
+				//	This means: pods with labels as the ones in the service (the one in this iteration) Spec.Selector and in the namespace as the service -> do this
+				firewallAction := pcn_types.FirewallAction{
+					PodLabels:       serv.Spec.Selector,
+					NamespaceLabels: nil,
+					NamespaceName:   serv.Namespace,
+					Key:             buildActionKey(serv.Spec.Selector, nil, serv.Namespace),
+					Templates:       buildTemplates("", string(action), direction, protocols),
+				}
+
+				actions = append(actions, firewallAction)
 			}
 		}
 	}
 
-	return parsed, nil
+	return parsed, actions, nil
+}
+
+func (p *PnpParser) BuildActions(target v1beta.PolycubeNetworkPolicyTarget, ingress v1beta.PolycubeNetworkPolicyIngressRuleContainer, egress v1beta.PolycubeNetworkPolicyEgressRuleContainer, currentNamespace string) {
+
 }
