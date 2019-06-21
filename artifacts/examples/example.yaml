@@ -1,6 +1,6 @@
 # A very basic example of a Polycube Network Policy
 ---
-apiVersion: polycubenetwork.com/v1beta
+apiVersion: polycube.network/v1beta
 kind: PolycubeNetworkPolicy
 metadata: 
   name: polycube-hello-world

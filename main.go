@@ -12,7 +12,7 @@ import (
 
 	"github.com/SunSince90/polycube-network-policies/controller"
 	v1beta_parser "github.com/SunSince90/polycube-network-policies/parser"
-	"github.com/SunSince90/polycube-network-policies/pkg/apis/polycubenetwork.com/v1beta"
+	"github.com/SunSince90/polycube-network-policies/pkg/apis/polycube.network/v1beta"
 	pnp_clientset "github.com/SunSince90/polycube-network-policies/pkg/client/clientset/versioned"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"

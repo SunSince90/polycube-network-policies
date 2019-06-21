@@ -3,9 +3,9 @@
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:  
-  name: polycubenetworkpolicies.polycubenetwork.com
+  name: polycubenetworkpolicies.polycube.network
 spec:  
-  group: polycubenetwork.com  
+  group: polycube.network  
   version: v1beta
   scope: Namespaced
   names:    

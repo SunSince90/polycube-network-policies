@@ -5,7 +5,7 @@ import (
 
 	controller "github.com/SunSince90/polycube-network-policies/controller"
 
-	"github.com/SunSince90/polycube-network-policies/pkg/apis/polycubenetwork.com/v1beta"
+	"github.com/SunSince90/polycube-network-policies/pkg/apis/polycube.network/v1beta"
 
 	//"fmt"
 

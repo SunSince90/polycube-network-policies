@@ -6,7 +6,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	pnp_clientset "github.com/SunSince90/polycube-network-policies/pkg/client/clientset/versioned"
-	pnp_informer "github.com/SunSince90/polycube-network-policies/pkg/client/informers/externalversions/polycubenetwork.com/v1beta"
+	pnp_informer "github.com/SunSince90/polycube-network-policies/pkg/client/informers/externalversions/polycube.network/v1beta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"

@@ -6,7 +6,7 @@ import (
 	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/SunSince90/polycube-network-policies/pkg/apis/polycubenetwork.com/v1beta"
+	"github.com/SunSince90/polycube-network-policies/pkg/apis/polycube.network/v1beta"
 
 	"github.com/stretchr/testify/assert"
 )
