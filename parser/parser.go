@@ -153,7 +153,7 @@ func (p *PnpParser) ParseIngress(target v1beta.PolycubeNetworkPolicyTarget, ingr
 
 	//	No rules?
 	if len(ingress.Rules) < 1 {
-		l.Errorln("There are no rules in ingress!")
+		l.Infoln("There are no rules in ingress!")
 		return parsed, [][]pcn_types.FirewallAction{}
 	}
 
@@ -216,7 +216,7 @@ func (p *PnpParser) ParseEgress(egress v1beta.PolycubeNetworkPolicyEgressRuleCon
 
 	//	No rules?
 	if len(egress.Rules) < 1 {
-		l.Errorln("There are no rules in egress!")
+		l.Infoln("There are no rules in egress!")
 		return parsed, [][]pcn_types.FirewallAction{}
 	}
 

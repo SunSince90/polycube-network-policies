@@ -110,21 +110,70 @@ func main() {
 			queryS := v1beta_parser.BuildServiceQuery(policy.ApplyTo.WithName, false)
 			queryN := v1beta_parser.BuildNamespaceQuery(policy.Namespace, nil, false)
 
+			//	Even for new services
 			s.Subscribe(pcn_types.Update, queryS, queryN, func(service *core_v1.Service) {
 				log.Println("policy with name", policy.Name, "should be undeployed and redeployed again.")
 				//	Cease with (subs=true)
 			})
 			/*s.Subscribe(pcn_types.Delete, queryS, queryN, func(service *core_v1.Service) {
 				log.Println("policy with name", policy.Name, "should be undeployed.")
+				//	cease with (subs=true)
 			})*/
+		}
+
+		//	Ingress actions
+		for i, actions := range ingressActions {
+			policyRuleName := policy.Name + "#" + string(i) + "i"
+			for _, action := range actions {
+
+				//	Build the namespace query:
+				//	If the user specifies to target peers on namespaces with certain labels, then we need to subscribe to them!
+				//	These are bad practices and probably even rare ones, but if a user puts a label to a namespace then we need to select those pods as well!
+				//	Same thing if the labels are removed!
+				queryN := pcn_types.ObjectQuery{}
+				if len(action.NamespaceName) < 1 || (len(action.NamespaceName) > 0 && action.NamespaceName != "*") {
+					queryN = v1beta_parser.BuildNamespaceQuery("", action.NamespaceLabels, false)
+					log.Println("Going to subscribe to updates to namespaces for", policyRuleName, queryN)
+
+					//	On update
+					//	What changed?
+					//	-> look at the labels of it
+					//	If the labels changed, then remove and re-deploy
+				}
+			}
+		}
+
+		//	Egress namespace actions
+		for i, actions := range egressActions {
+			policyRuleName := policy.Name + "#" + string(i) + "e"
+			for _, action := range actions {
+
+				//	Build the namespace query:
+				//	If the user specifies to target peers on namespaces with certain labels, then we need to subscribe to them!
+				//	These are bad practices and probably even rare ones, but if a user puts a label to a namespace then we need to select those pods as well!
+				//	Same thing if the labels are removed!
+				queryN := pcn_types.ObjectQuery{}
+				if len(action.NamespaceName) < 1 || (len(action.NamespaceName) > 0 && action.NamespaceName != "*") {
+					queryN = v1beta_parser.BuildNamespaceQuery("", action.NamespaceLabels, false)
+					log.Println("Going to subscribe to updates to namespaces for", policyRuleName, queryN)
+
+					//	On update
+					//	What changed?
+					//	-> look at the labels of it
+					//	If the labels changed, then remove and re-deploy
+				}
+			}
 		}
 
 		//	Egress service subscription
 		if len(policy.Spec.EngressRules.Rules) > 0 {
-			for _, peer := range policy.Spec.EngressRules.Rules {
+			for i, peer := range policy.Spec.EngressRules.Rules {
+				policyRuleName := policy.Name + "#" + string(i) + "e"
+
 				if peer.To.Peer == v1beta.ServicePeer {
 					queryS := v1beta_parser.BuildServiceQuery(peer.To.WithName, false)
 
+					//	Defaulting the namespace
 					if peer.To.OnNamespace == nil {
 						peer.To.OnNamespace = &v1beta.PolycubeNetworkPolicyNamespaceSelector{
 							WithNames: []string{policy.Namespace},
@@ -132,6 +181,7 @@ func main() {
 					}
 					anyNs := (peer.To.OnNamespace.Any != nil && *peer.To.OnNamespace.Any == true)
 
+					//	On namespaces with name?
 					if len(peer.To.OnNamespace.WithNames) > 0 {
 						for _, ns := range peer.To.OnNamespace.WithNames {
 							queryN := v1beta_parser.BuildNamespaceQuery(ns, nil, false)
@@ -139,16 +189,19 @@ func main() {
 							//	updates
 							s.Subscribe(pcn_types.Update, queryS, queryN, func(service *core_v1.Service) {
 								//	Just undeploy this rule and redeploy
+								log.Println("undeploy and redeploy", policyRuleName)
 							})
 
 							//	deletes
 							s.Subscribe(pcn_types.Delete, queryS, queryN, func(service *core_v1.Service) {
 								//	Just undeploy this rule
+								log.Println("delete", policyRuleName)
 							})
 
 							//	New
 							s.Subscribe(pcn_types.Delete, queryS, queryN, func(service *core_v1.Service) {
 								//	parse and deploy this rule
+								log.Println("deploy", policyRuleName)
 							})
 						}
 					} else {

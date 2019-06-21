@@ -91,7 +91,7 @@ type PolycubeNetworkPolicyIngressRule struct {
 	// Protocols is the level 4 protocol list
 	Protocols []PolycubeNetworkPolicyProtocolContainer `json:"protocols,omitempty"`
 	// TCPFlags is a list of TCP flags
-	TCPFlags []PolycubeNetworkPolicyTCPFlag `json:"tcpflags,omitempty"`
+	//TCPFlags []PolycubeNetworkPolicyTCPFlag `json:"tcpflags,omitempty"`
 	// Action is the action to be taken
 	Action PolycubeNetworkPolicyRuleAction `json:"action,omitempty"`
 	// Description is the description of the rule
