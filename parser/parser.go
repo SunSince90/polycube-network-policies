@@ -165,6 +165,7 @@ func (p *PnpParser) ParseIngress(target v1beta.PolycubeNetworkPolicyTarget, ingr
 	for i, rule := range ingress.Rules {
 
 		protocols := []v1beta.PolycubeNetworkPolicyProtocolContainer{}
+		action := ReformatPolycubePolicyAction(rule.Action)
 
 		//	You have set service as target but also specified the ports: I take it as you want to override something.
 		if len(rule.Protocols) < 1 && len(serviceProtocols) > 0 {
@@ -174,7 +175,7 @@ func (p *PnpParser) ParseIngress(target v1beta.PolycubeNetworkPolicyTarget, ingr
 		}
 
 		//	Parse the peer
-		generatedRules, generatedActions, err := p.ParsePeer(rule.From, protocols, namespace, direction, rule.Action)
+		generatedRules, generatedActions, err := p.ParsePeer(rule.From, protocols, namespace, direction, action)
 		if err != nil {
 			l.Errorf("Error while parsing rule #%d in ingress", i)
 		} else {
@@ -227,8 +228,10 @@ func (p *PnpParser) ParseEgress(egress v1beta.PolycubeNetworkPolicyEgressRuleCon
 	actions := [][]pcn_types.FirewallAction{}
 	for i, rule := range egress.Rules {
 
+		action := ReformatPolycubePolicyAction(rule.Action)
+
 		//	Parse the peer
-		generatedRules, generatedActions, err := p.ParsePeer(rule.To, rule.Protocols, namespace, direction, rule.Action)
+		generatedRules, generatedActions, err := p.ParsePeer(rule.To, rule.Protocols, namespace, direction, action)
 		if err != nil {
 			l.Errorf("Error while parsing rule #%d in egress", i)
 		} else {

@@ -276,6 +276,19 @@ func BuildServiceQuery(name string, any bool) pcn_types.ObjectQuery {
 	}
 }
 
+// ReformatPolycubePolicyAction parses and returns the appropriate action for the firewall
+func ReformatPolycubePolicyAction(action v1beta.PolycubeNetworkPolicyRuleAction) v1beta.PolycubeNetworkPolicyRuleAction {
+
+	switch action {
+	case v1beta.AllowAction, v1beta.ForwardAction, v1beta.PassAction, v1beta.PermitAction:
+		return v1beta.ForwardAction
+	case v1beta.BlockAction, v1beta.DropAction, v1beta.ForbidAction, v1beta.ProhibitAction:
+		return v1beta.DropAction
+	}
+
+	return "drop"
+}
+
 func formatProtocolsFromService(service core_v1.Service) ([]v1beta.PolycubeNetworkPolicyProtocolContainer, error) {
 
 	//	Only SCTP?
