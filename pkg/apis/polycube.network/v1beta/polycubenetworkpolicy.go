@@ -18,6 +18,7 @@ type PolycubeNetworkPolicy struct {
 	Spec PolycubeNetworkPolicySpec `json:"spec,omitempty"`
 }
 
+// PolycubeNetworkPolicyPriority is the explicit priority of the policy
 type PolycubeNetworkPolicyPriority int
 
 // PolycubeNetworkPolicyTarget is the target of this policy

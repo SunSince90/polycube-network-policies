@@ -121,11 +121,6 @@ func (in *PolycubeNetworkPolicyIngressRule) DeepCopyInto(out *PolycubeNetworkPol
 		*out = make([]PolycubeNetworkPolicyProtocolContainer, len(*in))
 		copy(*out, *in)
 	}
-	if in.TCPFlags != nil {
-		in, out := &in.TCPFlags, &out.TCPFlags
-		*out = make([]PolycubeNetworkPolicyTCPFlag, len(*in))
-		copy(*out, *in)
-	}
 	return
 }
 
