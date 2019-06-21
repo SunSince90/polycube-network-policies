@@ -5,10 +5,13 @@ import (
 	"os/signal"
 	"syscall"
 
+	pcn_types "github.com/SunSince90/polycube/src/components/k8s/pcn_k8s/types"
+	core_v1 "k8s.io/api/core/v1"
+
 	log "github.com/Sirupsen/logrus"
 
 	"github.com/SunSince90/polycube-network-policies/controller"
-	"github.com/SunSince90/polycube-network-policies/parser"
+	v1beta_parser "github.com/SunSince90/polycube-network-policies/parser"
 	"github.com/SunSince90/polycube-network-policies/pkg/apis/polycubenetwork.com/v1beta"
 	pnp_clientset "github.com/SunSince90/polycube-network-policies/pkg/client/clientset/versioned"
 	"k8s.io/client-go/kubernetes"
@@ -54,7 +57,7 @@ func main() {
 	// run the controller loop to process items
 	go p.Run()
 	go s.Run()
-	parser := parser.NewPolycubePolicyParser(p, s)
+	parser := v1beta_parser.NewPolycubePolicyParser(p, s)
 	c := controller.NewPcnPolicyController(kclientset, pclientset)
 	go c.Run(stopCh)
 	c.AddUpdateFunc("new", func(item interface{}) {
@@ -98,6 +101,77 @@ func main() {
 		for _, actions := range egressActions {
 			for _, action := range actions {
 				log.Printf("- %+v\n", action)
+			}
+		}
+
+		//	Service subscriptions
+		if policy.ApplyTo.Target == v1beta.ServiceTarget {
+			log.Println("Going to subscribe to changes to service", policy.ApplyTo.WithName, "on namespace", policy.Namespace)
+			queryS := v1beta_parser.BuildServiceQuery(policy.ApplyTo.WithName, false)
+			queryN := v1beta_parser.BuildNamespaceQuery(policy.Namespace, nil, false)
+
+			s.Subscribe(pcn_types.Update, queryS, queryN, func(service *core_v1.Service) {
+				log.Println("policy with name", policy.Name, "should be undeployed and redeployed again.")
+				//	Cease with (subs=true)
+			})
+			/*s.Subscribe(pcn_types.Delete, queryS, queryN, func(service *core_v1.Service) {
+				log.Println("policy with name", policy.Name, "should be undeployed.")
+			})*/
+		}
+
+		//	Egress service subscription
+		if len(policy.Spec.EngressRules.Rules) > 0 {
+			for _, peer := range policy.Spec.EngressRules.Rules {
+				if peer.To.Peer == v1beta.ServicePeer {
+					queryS := v1beta_parser.BuildServiceQuery(peer.To.WithName, false)
+
+					if peer.To.OnNamespace == nil {
+						peer.To.OnNamespace = &v1beta.PolycubeNetworkPolicyNamespaceSelector{
+							WithNames: []string{policy.Namespace},
+						}
+					}
+					anyNs := (peer.To.OnNamespace.Any != nil && *peer.To.OnNamespace.Any == true)
+
+					if len(peer.To.OnNamespace.WithNames) > 0 {
+						for _, ns := range peer.To.OnNamespace.WithNames {
+							queryN := v1beta_parser.BuildNamespaceQuery(ns, nil, false)
+
+							//	updates
+							s.Subscribe(pcn_types.Update, queryS, queryN, func(service *core_v1.Service) {
+								//	Just undeploy this rule and redeploy
+							})
+
+							//	deletes
+							s.Subscribe(pcn_types.Delete, queryS, queryN, func(service *core_v1.Service) {
+								//	Just undeploy this rule
+							})
+
+							//	New
+							s.Subscribe(pcn_types.Delete, queryS, queryN, func(service *core_v1.Service) {
+								//	parse and deploy this rule
+							})
+						}
+					} else {
+						queryN := v1beta_parser.BuildNamespaceQuery("", peer.To.OnNamespace.WithLabels, anyNs)
+
+						//	updates
+						s.Subscribe(pcn_types.Update, queryS, queryN, func(service *core_v1.Service) {
+							//	Just undeploy this rule and redeploy
+						})
+
+						//	deletes
+						s.Subscribe(pcn_types.Delete, queryS, queryN, func(service *core_v1.Service) {
+							//	Just undeploy this rule
+						})
+
+						//	New
+						s.Subscribe(pcn_types.Delete, queryS, queryN, func(service *core_v1.Service) {
+							//	parse and deploy this rule
+						})
+					}
+
+					//	TODO: update subscriptions for namespace labels
+				}
 			}
 		}
 

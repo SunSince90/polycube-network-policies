@@ -191,7 +191,7 @@ func TestBuildNsQuery(t *testing.T) {
 	//	Any is true and takes precedence
 	namespace := "ns"
 	nsLabels := map[string]string{"name": "ns"}
-	result := buildNamespaceQuery(namespace, nsLabels, true)
+	result := BuildNamespaceQuery(namespace, nsLabels, true)
 
 	assert.Equal(t, "name", result.By)
 	assert.Equal(t, "*", result.Name)
@@ -199,13 +199,13 @@ func TestBuildNsQuery(t *testing.T) {
 
 	//	Any is not true, name takes precedence
 
-	result = buildNamespaceQuery(namespace, nsLabels, false)
+	result = BuildNamespaceQuery(namespace, nsLabels, false)
 
 	assert.Equal(t, "name", result.By)
 	assert.Equal(t, namespace, result.Name)
 	assert.Empty(t, result.Labels)
 
-	result = buildNamespaceQuery("", nsLabels, false)
+	result = BuildNamespaceQuery("", nsLabels, false)
 
 	assert.Equal(t, "labels", result.By)
 	assert.Equal(t, nsLabels, result.Labels)
@@ -215,7 +215,7 @@ func TestBuildNsQuery(t *testing.T) {
 func TestBuildPodQuery(t *testing.T) {
 	//	Any is true and takes precedence
 	labels := map[string]string{"name": "tt"}
-	result := buildPodQuery(labels, true)
+	result := BuildPodQuery(labels, true)
 
 	assert.Equal(t, "name", result.By)
 	assert.Equal(t, "*", result.Name)
@@ -223,7 +223,7 @@ func TestBuildPodQuery(t *testing.T) {
 
 	//	Any is not true
 
-	result = buildPodQuery(labels, false)
+	result = BuildPodQuery(labels, false)
 
 	assert.Equal(t, "labels", result.By)
 	assert.Equal(t, labels, result.Labels)
@@ -232,13 +232,13 @@ func TestBuildPodQuery(t *testing.T) {
 
 func TestServicePodQuery(t *testing.T) {
 	name := "serv"
-	result := buildServiceQuery(name, true)
+	result := BuildServiceQuery(name, true)
 
 	assert.Equal(t, "name", result.By)
 	assert.Equal(t, "*", result.Name)
 	assert.Empty(t, result.Labels)
 
-	result = buildServiceQuery(name, false)
+	result = BuildServiceQuery(name, false)
 	assert.Equal(t, "name", result.By)
 	assert.Equal(t, name, result.Name)
 	assert.Empty(t, result.Labels)

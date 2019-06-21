@@ -8,9 +8,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 
 	core_v1 "k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"k8s.io/client-go/kubernetes"
 
 	"github.com/SunSince90/polycube-network-policies/pkg/apis/polycubenetwork.com/v1beta"
 	pcn_types "github.com/SunSince90/polycube/src/components/k8s/pcn_k8s/types"
@@ -221,32 +218,8 @@ func implodeLabels(labels map[string]string) string {
 	return strings.Trim(implodedLabels, ",")
 }
 
-// getNamespaceNames gets the namespaces names based on the provided query
-func getNamespaceNames(clientset kubernetes.Interface, any *bool, labels map[string]string) ([]string, error) {
-	// init list options
-	listOptions := meta_v1.ListOptions{}
-	if any != nil && *any == true {
-		listOptions = meta_v1.ListOptions{
-			LabelSelector: implodeLabels(labels),
-		}
-	}
-
-	//	Get the list of namespaces names
-	lister, err := clientset.CoreV1().Namespaces().List(listOptions)
-	if err != nil {
-		return nil, err
-	}
-
-	names := make([]string, len(lister.Items))
-	for i := 0; i < len(lister.Items); i++ {
-		names[i] = lister.Items[i].Name
-	}
-
-	return names, nil
-}
-
-// buildNamespaceQuery builds a namespace query
-func buildNamespaceQuery(name string, labels map[string]string, any bool) pcn_types.ObjectQuery {
+// BuildNamespaceQuery builds a namespace query
+func BuildNamespaceQuery(name string, labels map[string]string, any bool) pcn_types.ObjectQuery {
 	if !any {
 
 		//	Name provided?
@@ -272,8 +245,8 @@ func buildNamespaceQuery(name string, labels map[string]string, any bool) pcn_ty
 
 }
 
-// buildPodQuery builds a query for pods
-func buildPodQuery(labels map[string]string, any bool) pcn_types.ObjectQuery {
+// BuildPodQuery builds a query for pods
+func BuildPodQuery(labels map[string]string, any bool) pcn_types.ObjectQuery {
 
 	if !any {
 		return pcn_types.ObjectQuery{
@@ -288,8 +261,8 @@ func buildPodQuery(labels map[string]string, any bool) pcn_types.ObjectQuery {
 	}
 }
 
-// buildServiceQuery builds a query to get services from the service controller
-func buildServiceQuery(name string, any bool) pcn_types.ObjectQuery {
+// BuildServiceQuery builds a query to get services from the service controller
+func BuildServiceQuery(name string, any bool) pcn_types.ObjectQuery {
 	if !any {
 		return pcn_types.ObjectQuery{
 			By:   "name",

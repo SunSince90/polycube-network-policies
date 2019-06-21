@@ -307,7 +307,7 @@ func (p *PnpParser) ParsePod(peer v1beta.PolycubeNetworkPolicyPeer, protocols []
 	}
 
 	anyNs := (peer.OnNamespace.Any != nil && *peer.OnNamespace.Any == true)
-	queryP := buildPodQuery(peer.WithLabels, anyPod)
+	queryP := BuildPodQuery(peer.WithLabels, anyPod)
 
 	//-------------------------------------
 	//	Get the pods
@@ -315,7 +315,7 @@ func (p *PnpParser) ParsePod(peer v1beta.PolycubeNetworkPolicyPeer, protocols []
 
 	if len(peer.OnNamespace.WithNames) > 0 {
 		for _, ns := range peer.OnNamespace.WithNames {
-			queryN := buildNamespaceQuery(ns, nil, false)
+			queryN := BuildNamespaceQuery(ns, nil, false)
 
 			//	Now get the pods
 			found, err := p.podController.GetPods(queryP, queryN)
@@ -326,7 +326,7 @@ func (p *PnpParser) ParsePod(peer v1beta.PolycubeNetworkPolicyPeer, protocols []
 		}
 	} else {
 		// This also covers the case of anyNs = true
-		queryN := buildNamespaceQuery("", peer.OnNamespace.WithLabels, anyNs)
+		queryN := BuildNamespaceQuery("", peer.OnNamespace.WithLabels, anyNs)
 
 		//	Now get the pods
 		found, err := p.podController.GetPods(queryP, queryN)
@@ -408,7 +408,7 @@ func (p *PnpParser) ParseService(peer v1beta.PolycubeNetworkPolicyPeer, namespac
 	}
 
 	anyNs := (peer.OnNamespace.Any != nil && *peer.OnNamespace.Any == true)
-	queryS := buildServiceQuery(peer.WithName, anyS)
+	queryS := BuildServiceQuery(peer.WithName, anyS)
 	actions := []pcn_types.FirewallAction{}
 
 	//-------------------------------------
@@ -418,7 +418,7 @@ func (p *PnpParser) ParseService(peer v1beta.PolycubeNetworkPolicyPeer, namespac
 	//	Check the namespace
 	if len(peer.OnNamespace.WithNames) > 0 {
 		for _, ns := range peer.OnNamespace.WithNames {
-			queryN := buildNamespaceQuery(ns, nil, false)
+			queryN := BuildNamespaceQuery(ns, nil, false)
 
 			//	Now get the service
 			found, err := p.serviceController.GetServices(queryS, queryN)
@@ -429,7 +429,7 @@ func (p *PnpParser) ParseService(peer v1beta.PolycubeNetworkPolicyPeer, namespac
 		}
 	} else {
 		// This also covers the case of nsAny = true
-		queryN := buildNamespaceQuery("", peer.OnNamespace.WithLabels, anyNs)
+		queryN := BuildNamespaceQuery("", peer.OnNamespace.WithLabels, anyNs)
 
 		//	Now get the services
 		found, err := p.serviceController.GetServices(queryS, queryN)
@@ -492,8 +492,4 @@ func (p *PnpParser) ParseService(peer v1beta.PolycubeNetworkPolicyPeer, namespac
 	}
 
 	return parsed, actions, nil
-}
-
-func (p *PnpParser) BuildActions(target v1beta.PolycubeNetworkPolicyTarget, ingress v1beta.PolycubeNetworkPolicyIngressRuleContainer, egress v1beta.PolycubeNetworkPolicyEgressRuleContainer, currentNamespace string) {
-
 }
