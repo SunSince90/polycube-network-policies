@@ -19,7 +19,7 @@ limitations under the License.
 package versioned
 
 import (
-	polycubenetworkv1beta "github.com/SunSince90/polycube-network-policies/pkg/client/clientset/versioned/typed/polycubenetwork.com/v1beta"
+	polycubev1beta "github.com/SunSince90/polycube-network-policies/pkg/client/clientset/versioned/typed/polycube.network/v1beta"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
@@ -27,19 +27,19 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	PolycubenetworkV1beta() polycubenetworkv1beta.PolycubenetworkV1betaInterface
+	PolycubeV1beta() polycubev1beta.PolycubeV1betaInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	polycubenetworkV1beta *polycubenetworkv1beta.PolycubenetworkV1betaClient
+	polycubeV1beta *polycubev1beta.PolycubeV1betaClient
 }
 
-// PolycubenetworkV1beta retrieves the PolycubenetworkV1betaClient
-func (c *Clientset) PolycubenetworkV1beta() polycubenetworkv1beta.PolycubenetworkV1betaInterface {
-	return c.polycubenetworkV1beta
+// PolycubeV1beta retrieves the PolycubeV1betaClient
+func (c *Clientset) PolycubeV1beta() polycubev1beta.PolycubeV1betaInterface {
+	return c.polycubeV1beta
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -58,7 +58,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
-	cs.polycubenetworkV1beta, err = polycubenetworkv1beta.NewForConfig(&configShallowCopy)
+	cs.polycubeV1beta, err = polycubev1beta.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
-	cs.polycubenetworkV1beta = polycubenetworkv1beta.NewForConfigOrDie(c)
+	cs.polycubeV1beta = polycubev1beta.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -83,7 +83,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.polycubenetworkV1beta = polycubenetworkv1beta.New(c)
+	cs.polycubeV1beta = polycubev1beta.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

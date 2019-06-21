@@ -21,7 +21,7 @@ package externalversions
 import (
 	"fmt"
 
-	v1beta "github.com/SunSince90/polycube-network-policies/pkg/apis/polycubenetwork.com/v1beta"
+	v1beta "github.com/SunSince90/polycube-network-policies/pkg/apis/polycube.network/v1beta"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -52,9 +52,9 @@ func (f *genericInformer) Lister() cache.GenericLister {
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
-	// Group=polycubenetwork.com, Version=v1beta
+	// Group=polycube.network, Version=v1beta
 	case v1beta.SchemeGroupVersion.WithResource("polycubenetworkpolicies"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Polycubenetwork().V1beta().PolycubeNetworkPolicies().Informer()}, nil
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Polycube().V1beta().PolycubeNetworkPolicies().Informer()}, nil
 
 	}
 

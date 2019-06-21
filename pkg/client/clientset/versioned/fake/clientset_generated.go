@@ -20,8 +20,8 @@ package fake
 
 import (
 	clientset "github.com/SunSince90/polycube-network-policies/pkg/client/clientset/versioned"
-	polycubenetworkv1beta "github.com/SunSince90/polycube-network-policies/pkg/client/clientset/versioned/typed/polycubenetwork.com/v1beta"
-	fakepolycubenetworkv1beta "github.com/SunSince90/polycube-network-policies/pkg/client/clientset/versioned/typed/polycubenetwork.com/v1beta/fake"
+	polycubev1beta "github.com/SunSince90/polycube-network-policies/pkg/client/clientset/versioned/typed/polycube.network/v1beta"
+	fakepolycubev1beta "github.com/SunSince90/polycube-network-policies/pkg/client/clientset/versioned/typed/polycube.network/v1beta/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -76,7 +76,7 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 
 var _ clientset.Interface = &Clientset{}
 
-// PolycubenetworkV1beta retrieves the PolycubenetworkV1betaClient
-func (c *Clientset) PolycubenetworkV1beta() polycubenetworkv1beta.PolycubenetworkV1betaInterface {
-	return &fakepolycubenetworkv1beta.FakePolycubenetworkV1beta{Fake: &c.Fake}
+// PolycubeV1beta retrieves the PolycubeV1betaClient
+func (c *Clientset) PolycubeV1beta() polycubev1beta.PolycubeV1betaInterface {
+	return &fakepolycubev1beta.FakePolycubeV1beta{Fake: &c.Fake}
 }

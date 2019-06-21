@@ -25,7 +25,7 @@ import (
 
 	versioned "github.com/SunSince90/polycube-network-policies/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/SunSince90/polycube-network-policies/pkg/client/informers/externalversions/internalinterfaces"
-	polycubenetworkcom "github.com/SunSince90/polycube-network-policies/pkg/client/informers/externalversions/polycubenetwork.com"
+	polycubenetwork "github.com/SunSince90/polycube-network-policies/pkg/client/informers/externalversions/polycube.network"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -172,9 +172,9 @@ type SharedInformerFactory interface {
 	ForResource(resource schema.GroupVersionResource) (GenericInformer, error)
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
-	Polycubenetwork() polycubenetworkcom.Interface
+	Polycube() polycubenetwork.Interface
 }
 
-func (f *sharedInformerFactory) Polycubenetwork() polycubenetworkcom.Interface {
-	return polycubenetworkcom.New(f, f.namespace, f.tweakListOptions)
+func (f *sharedInformerFactory) Polycube() polycubenetwork.Interface {
+	return polycubenetwork.New(f, f.namespace, f.tweakListOptions)
 }
