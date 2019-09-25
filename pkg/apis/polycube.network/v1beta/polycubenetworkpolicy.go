@@ -53,10 +53,10 @@ type PolycubeNetworkPolicySpec struct {
 	Description string `json:"description,omitempty"`
 	// +optional
 	// IngressRules contains the ingress rules
-	IngressRules PolycubeNetworkPolicyIngressRuleContainer `json:"ingressRules,omitempty"`
+	IngressRules *PolycubeNetworkPolicyIngressRuleContainer `json:"ingressRules,omitempty"`
 	// +optional
 	// EgressRules contains the egress rules
-	EngressRules PolycubeNetworkPolicyEgressRuleContainer `json:"egressRules,omitempty"`
+	EngressRules *PolycubeNetworkPolicyEgressRuleContainer `json:"egressRules,omitempty"`
 }
 
 // PolycubeNetworkPolicyIngressRuleContainer is a container of ingress rules
@@ -152,8 +152,6 @@ type PolycubeNetworkPolicyWithIP struct {
 type PolycubeNetworkPolicyPeerObject string
 
 const (
-	// ServicePeer is the Service
-	ServicePeer PolycubeNetworkPolicyPeerObject = "service"
 	// PodPeer is the Pod
 	PodPeer PolycubeNetworkPolicyPeerObject = "pod"
 	// WorldPeer is the World
